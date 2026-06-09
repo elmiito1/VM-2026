@@ -1,3 +1,6 @@
+bash
+
+cat > /mnt/user-data/outputs/vm2026.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="sv">
 <head>
@@ -6,15 +9,19 @@
 <title>VM-tipset 2026</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-:root{--green:#1a6b3c;--green-light:#f0faf4;--green-mid:#d1fae5;--bg:#f5f6f8;--card:#fff;--border:#e5e7eb;--text:#111827;--mid:#4b5563;--soft:#9ca3af;--radius:12px;--radius-sm:8px}
+:root{--green:#1a6b3c;--green-light:#f0faf4;--green-mid:#d1fae5;--bg:#f5f6f8;--card:#fff;--border:#e5e7eb;--text:#111827;--mid:#4b5563;--soft:#9ca3af;--radius:12px;--radius-sm:8px;--yellow:#fef3c7;--yellow-text:#92400e}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 .header{background:var(--green);color:#fff;padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 .header-left{display:flex;align-items:center;gap:10px}
 .header-title{font-size:16px;font-weight:700}
 .header-sub{font-size:11px;opacity:.75;margin-top:1px}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .upload-btn{display:flex;align-items:center;gap:6px;padding:7px 13px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);border-radius:var(--radius-sm);font-size:12px;color:#fff;cursor:pointer;font-family:inherit}
 .upload-btn:hover{background:rgba(255,255,255,.28)}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#4ade80;animation:pulse 2s infinite;flex-shrink:0}
+.live-label{font-size:11px;opacity:.85;display:flex;align-items:center;gap:5px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 input[type=file]{display:none}
 .nav{background:var(--card);border-bottom:1px solid var(--border);display:flex;overflow-x:auto}
 .nav::-webkit-scrollbar{display:none}
@@ -29,8 +36,8 @@ input[type=file]{display:none}
 .metric-sub{font-size:11px;color:var(--soft);margin-top:2px}
 .section-label{font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.8px;margin-bottom:9px}
 .lb{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
-.lb-head{display:grid;grid-template-columns:38px 1fr 58px 64px 28px;gap:6px;padding:8px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.5px}
-.lb-row{display:grid;grid-template-columns:38px 1fr 58px 64px 28px;gap:6px;padding:10px 14px;border-top:1px solid var(--border);align-items:center;cursor:pointer;transition:background .1s}
+.lb-head{display:grid;grid-template-columns:38px 1fr 64px 28px;gap:6px;padding:8px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.5px}
+.lb-row{display:grid;grid-template-columns:38px 1fr 64px 28px;gap:6px;padding:10px 14px;border-top:1px solid var(--border);align-items:center;cursor:pointer;transition:background .1s}
 .lb-row:first-child{border-top:none}
 .lb-row:hover{background:#fafafa}
 .lb-row.gold{background:linear-gradient(90deg,#fffbeb,var(--card) 60%)}
@@ -42,7 +49,6 @@ input[type=file]{display:none}
 .p-vmwinner{font-size:10px;color:var(--soft);margin-top:1px}
 .bar-wrap{height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden}
 .bar-fill{height:100%;border-radius:2px}
-.pts-last{font-size:13px;text-align:right;color:var(--mid)}
 .pts-total{font-size:14px;font-weight:700;text-align:right;color:var(--green)}
 .trend-eq{color:var(--soft);font-size:12px;text-align:center}
 .detail-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:1rem}
@@ -58,44 +64,56 @@ input[type=file]{display:none}
 .back-btn{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--green);cursor:pointer;margin-bottom:12px;padding:4px 0}
 .tips-table{width:100%;border-collapse:collapse;font-size:12px}
 .tips-table th{background:var(--bg);padding:7px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
-.tips-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tips-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
 .tips-table tr:last-child td{border-bottom:none}
 .tips-table tr:hover td{background:#fafafa}
-.tip-val{font-weight:600}
+.tip-correct{background:var(--green-mid);color:#065f46;font-weight:700;border-radius:4px;padding:1px 5px;font-size:11px}
+.tip-wrong{background:#fee2e2;color:#991b1b;font-weight:700;border-radius:4px;padding:1px 5px;font-size:11px}
+.tip-pending{color:var(--soft)}
+.groups-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.group-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.group-header{padding:10px 14px;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between}
+.group-teams{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.team-chip{font-size:11px;font-weight:600;padding:3px 9px;background:var(--green-light);color:var(--green);border-radius:20px}
+.match-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:7px 14px;border-top:1px solid var(--border);font-size:12px;gap:8px}
+.match-home{text-align:right;font-weight:500}
+.match-away{text-align:left;font-weight:500}
+.match-score{text-align:center;font-weight:700;font-size:13px;min-width:52px;padding:2px 8px;border-radius:6px}
+.score-done{background:var(--green-mid);color:#065f46}
+.score-live{background:#fef3c7;color:#92400e;animation:pulse 2s infinite}
+.score-pending{background:var(--bg);color:var(--soft);font-weight:400;font-size:11px}
+.group-standings{border-top:1px solid var(--border)}
+.standings-head{display:grid;grid-template-columns:1fr 28px 28px 28px 28px 28px 32px;gap:4px;padding:5px 14px;background:var(--bg);font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase}
+.standings-row{display:grid;grid-template-columns:1fr 28px 28px 28px 28px 28px 32px;gap:4px;padding:6px 14px;border-top:1px solid var(--border);font-size:12px;align-items:center}
+.standings-row.qualified{background:var(--green-light)}
+.standings-pos{width:16px;height:16px;border-radius:50%;background:var(--green);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.standings-pos.q3{background:#f59e0b}
+.standings-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.standings-num{text-align:center;color:var(--mid)}
+.standings-pts{text-align:center;font-weight:700;color:var(--green)}
+.playoff-round{margin-bottom:1.5rem}
+.playoff-round-title{font-size:13px;font-weight:700;padding:8px 12px;background:var(--green);color:#fff;border-radius:var(--radius-sm);margin-bottom:8px}
+.playoff-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.playoff-match{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px}
+.playoff-team{font-size:12px;font-weight:600;padding:4px 0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+.playoff-team:last-child{border-bottom:none}
+.playoff-team.winner{color:var(--green)}
+.playoff-team.loser{color:var(--soft)}
+.playoff-team.tbd{color:var(--soft);font-style:italic}
+.playoff-score{font-size:11px;color:var(--soft)}
 .format-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;font-size:13px;color:var(--mid);line-height:1.7}
 .format-box code{font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11px;color:var(--text)}
 .empty{text-align:center;padding:3rem 1rem;color:var(--soft);font-size:14px}
 .empty-icon{font-size:40px;margin-bottom:10px;opacity:.4}
-
-/* GROUPS */
-.groups-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
-.group-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
-.group-header{padding:10px 14px;background:var(--green);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between}
-.group-teams{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-bottom:1px solid var(--border)}
-.team-chip{font-size:11px;font-weight:600;padding:3px 9px;background:var(--green-light);color:var(--green);border-radius:20px}
-.match-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:7px 14px;border-top:1px solid var(--border);font-size:12px;gap:8px}
-.match-row:first-child{border-top:none}
-.match-home{text-align:right;font-weight:500;color:var(--text)}
-.match-away{text-align:left;font-weight:500;color:var(--text)}
-.match-score{text-align:center;font-weight:700;font-size:13px;min-width:52px;padding:2px 8px;border-radius:6px}
-.score-done{background:var(--green-mid);color:#065f46}
-.score-pending{background:var(--bg);color:var(--soft);font-weight:400;font-size:11px}
-
-/* SLUTSPEL */
-.playoff-section{margin-bottom:1.5rem}
-.playoff-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;padding:8px 12px;background:var(--green);color:#fff;border-radius:var(--radius-sm)}
-.playoff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
-.playoff-match{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;font-size:12px}
-.playoff-teams{display:flex;flex-direction:column;gap:4px}
-.playoff-team{font-weight:600;color:var(--text);padding:3px 0;display:flex;align-items:center;justify-content:space-between}
-.playoff-team.winner{color:var(--green)}
-.playoff-team.loser{color:var(--soft)}
-.playoff-vs{font-size:10px;color:var(--soft);text-align:center;padding:1px 0}
-.playoff-label{font-size:10px;color:var(--soft);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
-
+.loading{text-align:center;padding:2rem;color:var(--soft);font-size:13px}
+.api-notice{background:var(--yellow);border:1px solid #fcd34d;border-radius:var(--radius);padding:12px 16px;font-size:12px;color:var(--yellow-text);margin-bottom:1rem}
+.pts-badge{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px}
+.pts-green{background:var(--green-mid);color:#065f46}
+.pts-red{background:#fee2e2;color:#991b1b}
 @media(max-width:480px){
-  .lb-head,.lb-row{grid-template-columns:32px 1fr 48px 56px 24px;gap:4px;padding:9px 10px}
+  .lb-head,.lb-row{grid-template-columns:32px 1fr 56px 24px;gap:4px;padding:9px 10px}
   .groups-grid{grid-template-columns:1fr}
+  .standings-head,.standings-row{grid-template-columns:1fr 24px 24px 24px 24px 24px 28px;gap:2px;padding:5px 10px}
 }
 </style>
 </head>
@@ -106,11 +124,14 @@ input[type=file]{display:none}
     <div style="font-size:24px">🏆</div>
     <div>
       <div class="header-title">VM-tipset 2026</div>
-      <div class="header-sub" id="header-sub">Ladda upp ert Excel för att börja</div>
+      <div class="header-sub" id="header-sub">Laddar data...</div>
     </div>
   </div>
-  <button class="upload-btn" onclick="document.getElementById('fileInput').click()">📤 Uppdatera Excel</button>
-  <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(this)">
+  <div class="header-right">
+    <div class="live-label"><div class="live-dot"></div><span id="last-update">Uppdaterar...</span></div>
+    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">📤 Tips-Excel</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(this)">
+  </div>
 </div>
 
 <nav class="nav">
@@ -118,105 +139,214 @@ input[type=file]{display:none}
   <div class="nav-tab" data-tab="groups" onclick="switchTab('groups')">⚽ Grupper</div>
   <div class="nav-tab" data-tab="playoff" onclick="switchTab('playoff')">🏆 Slutspel</div>
   <div class="nav-tab" data-tab="tips" onclick="switchTab('tips')">📋 Alla tips</div>
-  <div class="nav-tab" data-tab="howto" onclick="switchTab('howto')">❓ Hjälp</div>
 </nav>
 
-<!-- LEADERBOARD -->
 <div id="page-leaderboard" class="page active">
   <div class="metrics" id="metrics">
-    <div class="metric"><div class="metric-label">Ledare</div><div class="metric-value">–</div><div class="metric-sub">Ladda upp Excel</div></div>
-    <div class="metric"><div class="metric-label">Deltagare</div><div class="metric-value">–</div><div class="metric-sub">i ligan</div></div>
-    <div class="metric"><div class="metric-label">VM-favorit</div><div class="metric-value" style="font-size:14px">–</div><div class="metric-sub">vanligaste tipset</div></div>
-    <div class="metric"><div class="metric-label">Snitt</div><div class="metric-value">–</div><div class="metric-sub">poäng per person</div></div>
+    <div class="metric"><div class="metric-label">Ledare</div><div class="metric-value" id="m-leader">–</div><div class="metric-sub" id="m-leader-pts">Laddar...</div></div>
+    <div class="metric"><div class="metric-label">Deltagare</div><div class="metric-value" id="m-players">–</div><div class="metric-sub">i ligan</div></div>
+    <div class="metric"><div class="metric-label">VM-favorit</div><div class="metric-value" id="m-fav" style="font-size:14px">–</div><div class="metric-sub">vanligaste tipset</div></div>
+    <div class="metric"><div class="metric-label">Matcher</div><div class="metric-value" id="m-played">–</div><div class="metric-sub" id="m-played-sub">spelade</div></div>
   </div>
-  <div class="section-label">Ställning – klicka för detaljer</div>
+  <div class="section-label">Ställning</div>
   <div class="lb">
     <div class="lb-head">
-      <div style="text-align:center">#</div>
-      <div>Deltagare</div>
-      <div style="text-align:right">GW</div>
-      <div style="text-align:right">Totalt</div>
-      <div></div>
+      <div style="text-align:center">#</div><div>Deltagare</div><div style="text-align:right">Totalt</div><div></div>
     </div>
-    <div id="lb-rows"><div class="empty"><div class="empty-icon">📊</div>Ladda upp ert Excel för att se ställningen</div></div>
+    <div id="lb-rows"><div class="loading">⏳ Ladda upp ert tips-Excel för att se ställningen</div></div>
   </div>
 </div>
 
-<!-- PLAYER DETAIL -->
 <div id="page-detail" class="page">
-  <div class="back-btn" onclick="switchTab('leaderboard')">← Tillbaka till ställning</div>
+  <div class="back-btn" onclick="switchTab('leaderboard')">← Tillbaka</div>
   <div id="detail-content"></div>
 </div>
 
-<!-- GROUPS -->
 <div id="page-groups" class="page">
+  <div id="api-notice" class="api-notice" style="display:none">⚠️ Kunde inte hämta live-data. Visar schemalagda matcher utan resultat.</div>
   <div class="section-label">Gruppspel – 12 grupper</div>
-  <div class="groups-grid" id="groups-grid">
-    <div class="empty"><div class="empty-icon">⚽</div>Ladda upp ert Excel för att se grupperna</div>
-  </div>
+  <div class="groups-grid" id="groups-grid"><div class="loading">⏳ Hämtar matchdata...</div></div>
 </div>
 
-<!-- PLAYOFF -->
 <div id="page-playoff" class="page">
   <div class="section-label">Slutspel</div>
-  <div id="playoff-content">
-    <div class="empty"><div class="empty-icon">🏆</div>Ladda upp ert Excel för att se slutspelet</div>
-  </div>
+  <div id="playoff-content"><div class="loading">⏳ Hämtar slutspelsdata...</div></div>
 </div>
 
-<!-- ALL TIPS -->
 <div id="page-tips" class="page">
   <div class="section-label">Alla deltagares tips</div>
-  <div id="tips-content"><div class="empty"><div class="empty-icon">📋</div>Ladda upp ert Excel för att se alla tips</div></div>
-</div>
-
-<!-- HOWTO -->
-<div id="page-howto" class="page">
-  <div class="section-label">Så uppdaterar du</div>
-  <div class="format-box" style="margin-bottom:1.2rem">
-    Klicka på <strong>"Uppdatera Excel"</strong> och välj er fil. Sidan läser automatiskt av alla tips, matcher och slutspel.<br><br>
-    <em>Inga data skickas till internet – allt sker lokalt i webbläsaren.</em>
-  </div>
-  <div class="section-label">Poängsystem</div>
-  <div class="format-box">
-    <code>Rätt resultat</code> = 3p &nbsp;|&nbsp; <code>Rätt tecken</code> = 1p<br>
-    <code>Målskytt</code> = 1p/mål &nbsp;|&nbsp; <code>Skytteligavinnare</code> = 2p<br>
-    <code>Assistspelare</code> = 1p/assist &nbsp;|&nbsp; <code>Vinnare assistligan</code> = 2p<br>
-    <code>VM-vinnare</code> = 5p<br>
-    <code>32→16</code> = 1p/rätt &nbsp;|&nbsp; <code>16→8</code> = 1p/rätt &nbsp;|&nbsp; <code>8→4</code> = 1p/rätt<br>
-    <code>4→2 (semifinal)</code> = 1p/rätt &nbsp;|&nbsp; <code>2→final</code> = 1p/rätt
-  </div>
+  <div id="tips-content"><div class="empty"><div class="empty-icon">📋</div>Ladda upp ert Excel</div></div>
 </div>
 
 <script>
-const COLORS=['#1a6b3c','#2563eb','#7c3aed','#db2777','#b45309','#0891b2','#059669','#dc2626','#4f46e5','#0d9488','#c2410c','#7c3aed'];
+// ===== CONFIG =====
+const API_KEY = '6b8de6ca938e4639990358e7f7a01233';
+const API_BASE = 'https://api.football-data.org/v4';
+const REFRESH_MS = 60000; // uppdatera var 60:e sekund
 
-// Static match data — all 12 groups with their matches
-const GROUPS = [
-  {name:'Grupp A', teams:['Mexiko','Sydafrika','Sydkorea','Tjeckien'], matches:['Mexiko–Sydafrika','Sydkorea–Tjeckien','Tjeckien–Sydafrika','Mexiko–Sydkorea','Tjeckien–Mexiko','Sydafrika–Sydkorea']},
-  {name:'Grupp B', teams:['Kanada','Qatar','Schweiz','Bosnien & Hercegovina'], matches:['Kanada–Bosnien & Hercegovina','Qatar–Schweiz','Schweiz–Bosnien & Hercegovina','Kanada–Qatar','Schweiz–Kanada','Bosnien & Hercegovina–Qatar']},
-  {name:'Grupp C', teams:['Brasilien','Haiti','Marocko','Skottland'], matches:['Brasilien–Marocko','Haiti–Skottland','Skottland–Marocko','Brasilien–Haiti','Skottland–Brasilien','Marocko–Haiti']},
-  {name:'Grupp D', teams:['USA','Paraguay','Australien','Turkiet'], matches:['USA–Paraguay','Australien–Turkiet','USA–Australien','Turkiet–Paraguay','Turkiet–USA','Paraguay–Australien']},
-  {name:'Grupp E', teams:['Tyskland','Curacao','Elfenbenskusten','Ecuador'], matches:['Tyskland–Curacao','Elfenbenskusten–Ecuador','Tyskland–Elfenbenskusten','Ecuador–Curacao','Curacao–Elfenbenskusten','Ecuador–Tyskland']},
-  {name:'Grupp F', teams:['Nederländerna','Japan','Sverige','Tunisien'], matches:['Nederländerna–Japan','Sverige–Tunisien','Nederländerna–Sverige','Tunisien–Japan','Japan–Sverige','Tunisien–Nederländerna']},
-  {name:'Grupp G', teams:['Belgien','Egypten','Iran','Nya Zeeland'], matches:['Belgien–Egypten','Iran–Nya Zeeland','Belgien–Iran','Nya Zeeland–Egypten','Egypten–Iran','Nya Zeeland–Belgien']},
-  {name:'Grupp H', teams:['Spanien','Kap Verde','Saudiarabien','Uruguay'], matches:['Spanien–Kap Verde','Saudiarabien–Uruguay','Spanien–Saudiarabien','Uruguay–Kap Verde','Kap Verde–Saudiarabien','Uruguay–Spanien']},
-  {name:'Grupp I', teams:['Frankrike','Senegal','Norge','Irak'], matches:['Frankrike–Senegal','Norge–Irak','Frankrike–Irak','Norge–Senegal','Norge–Frankrike','Senegal–Irak']},
-  {name:'Grupp J', teams:['Argentina','Algeriet','Österrike','Jordanien'], matches:['Argentina–Algeriet','Österrike–Jordanien','Argentina–Österrike','Jordanien–Algeriet','Algeriet–Österrike','Jordanien–Argentina']},
-  {name:'Grupp K', teams:['Portugal','Kongo','Uzbekistan','Colombia'], matches:['Portugal–Kongo','Uzbekistan–Colombia','Portugal–Uzbekistan','Colombia–Kongo','Colombia–Portugal','Kongo–Uzbekistan']},
-  {name:'Grupp L', teams:['England','Kroatien','Ghana','Panama'], matches:['England–Kroatien','Ghana–Panama','England–Ghana','Panama–Kroatien','Panama–England','Kroatien–Ghana']},
-];
+const COLORS=['#1a6b3c','#2563eb','#7c3aed','#db2777','#b45309','#0891b2','#059669','#dc2626','#4f46e5','#0d9488','#c2410c','#0284c7'];
 
-const PLAYOFF_ROUNDS = [
-  {name:'32 lag → 16-delsfinal', slots:32, colStart:203},
-  {name:'16 lag → Åttondelsfinal', slots:16, colStart:236},
-  {name:'8 lag → Kvartsfinal', slots:8, colStart:252},
-  {name:'4 lag → Semifinal', slots:4, colStart:260},
-  {name:'2 lag → Final', slots:2, colStart:264},
-];
+// Namn-mappning: svenska namn → engelska (API-format)
+const TEAM_MAP = {
+  'mexiko':'Mexico','sydafrika':'South Africa','sydkorea':'Korea Republic','tjeckien':'Czech Republic',
+  'kanada':'Canada','qatar':'Qatar','schweiz':'Switzerland','bosnien & hercegovina':'Bosnia and Herzegovina','b&h':'Bosnia and Herzegovina',
+  'brasilien':'Brazil','haiti':'Haiti','marocko':'Morocco','skottland':'Scotland',
+  'usa':'USA','paraguay':'Paraguay','australien':'Australia','turkiet':'Turkey',
+  'tyskland':'Germany','curacao':'Curaçao','elfenbenskusten':'Ivory Coast','ecuador':'Ecuador',
+  'nederländerna':'Netherlands','japan':'Japan','sverige':'Sweden','tunisien':'Tunisia',
+  'belgien':'Belgium','egypten':'Egypt','iran':'Iran','nya zeeland':'New Zealand',
+  'spanien':'Spain','kap verde':'Cabo Verde','saudiarabien':'Saudi Arabia','uruguay':'Uruguay',
+  'frankrike':'France','senegal':'Senegal','norge':'Norway','irak':'Iraq',
+  'argentina':'Argentina','algeriet':'Algeria','österrike':'Austria','jordanien':'Jordan',
+  'portugal':'Portugal','kongo':'Congo','uzbekistan':'Uzbekistan','colombia':'Colombia',
+  'england':'England','kroatien':'Croatia','ghana':'Ghana','panama':'Panama',
+};
 
-let appData = {players:[], matchResults:{}, playoffData:{}, loaded:false};
+function toEng(name){return TEAM_MAP[name.toLowerCase()]||name;}
+function toSwe(engName){
+  const entry=Object.entries(TEAM_MAP).find(([k,v])=>v.toLowerCase()===engName.toLowerCase());
+  return entry?entry[0].charAt(0).toUpperCase()+entry[0].slice(1):engName;
+}
 
+// ===== STATE =====
+let state = {
+  players: [],
+  matches: [],      // från API
+  standings: {},    // grupptabeller från API
+  knockout: [],     // slutspelsmatcher från API
+  lastFetch: null,
+  apiOk: false,
+};
+
+// ===== API =====
+async function fetchAPI(path) {
+  try {
+    const r = await fetch(`${API_BASE}${path}`, {
+      headers: {'X-Auth-Token': API_KEY}
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch(e) {
+    console.warn('API error:', e);
+    return null;
+  }
+}
+
+async function loadMatchData() {
+  // Hämta alla matcher i VM 2026
+  const data = await fetchAPI('/competitions/WC/matches?season=2026');
+  if (!data || !data.matches) {
+    document.getElementById('api-notice').style.display='block';
+    state.apiOk = false;
+    renderGroupsStatic();
+    renderPlayoffStatic();
+    return;
+  }
+  state.apiOk = true;
+  state.matches = data.matches;
+
+  // Bygg matchresultat-map: "Hemmalag–Bortalag" → {home, away, scoreH, scoreA, status}
+  state.matchResults = {};
+  for (const m of data.matches) {
+    const homeEng = m.homeTeam?.shortName || m.homeTeam?.name || '';
+    const awayEng = m.awayTeam?.shortName || m.awayTeam?.name || '';
+    const homeSwe = toSwe(homeEng);
+    const awaySwe = toSwe(awayEng);
+    const key = `${homeSwe}–${awaySwe}`;
+    const keyEng = `${homeEng}–${awayEng}`;
+    const score = m.score?.fullTime;
+    const result = {
+      homeSwe, awaySwe, homeEng, awayEng,
+      scoreH: score?.home ?? null,
+      scoreA: score?.away ?? null,
+      status: m.status, // SCHEDULED, LIVE, IN_PLAY, FINISHED, PAUSED
+      stage: m.stage,
+      group: m.group,
+      matchday: m.matchday,
+      id: m.id,
+    };
+    state.matchResults[key] = result;
+    state.matchResults[keyEng] = result;
+  }
+
+  // Standings
+  const sData = await fetchAPI('/competitions/WC/standings?season=2026');
+  if (sData?.standings) {
+    state.standings = {};
+    for (const sg of sData.standings) {
+      if (sg.type === 'TOTAL') {
+        state.standings[sg.group] = sg.table;
+      }
+    }
+  }
+
+  state.lastFetch = new Date();
+  document.getElementById('last-update').textContent = `Uppdaterat ${state.lastFetch.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'})}`;
+
+  // Räkna om poäng om vi har spelare
+  if (state.players.length) calcAllScores();
+
+  renderGroups();
+  renderPlayoff();
+  renderLeaderboard();
+  renderMetrics();
+
+  // Räkna matchstatistik
+  const played = state.matches.filter(m=>m.status==='FINISHED').length;
+  document.getElementById('m-played').textContent = played;
+  document.getElementById('m-played-sub').textContent = `av ${state.matches.length} spelade`;
+}
+
+// ===== POÄNGBERÄKNING =====
+function calcAllScores() {
+  for (const p of state.players) {
+    p.total = 0;
+    p.breakdown = {};
+
+    // Mattips
+    for (const [matchKey, tip] of Object.entries(p.matchTips)) {
+      const result = state.matchResults[matchKey];
+      if (!result || result.status !== 'FINISHED') continue;
+      if (result.scoreH === null) continue;
+
+      let pts = 0;
+      const tipRes = parseTipScore(tip.res);
+      const tipSign = tip.sign?.trim().toUpperCase();
+
+      // Rätt resultat = 3p
+      if (tipRes && tipRes.h === result.scoreH && tipRes.a === result.scoreA) {
+        pts += 3;
+      }
+      // Rätt tecken = 1p
+      const actualSign = getSign(result.scoreH, result.scoreA);
+      const tippedSign = tipRes ? getSign(tipRes.h, tipRes.a) : tipSign;
+      if (tippedSign && tippedSign === actualSign) {
+        pts += 1;
+      }
+      if (pts > 0) {
+        p.total += pts;
+        p.breakdown[matchKey] = pts;
+      }
+    }
+    // Individuella tips räknas manuellt (målskyttar, VM-vinnare) — ingen automatik utan mer data
+  }
+}
+
+function parseTipScore(s) {
+  if (!s) return null;
+  const m = String(s).match(/(\d+)\s*[-–]\s*(\d+)/);
+  if (!m) return null;
+  return {h: parseInt(m[1]), a: parseInt(m[2])};
+}
+
+function getSign(h, a) {
+  if (h === null || a === null) return null;
+  if (h > a) return '1';
+  if (h < a) return '2';
+  return 'X';
+}
+
+// ===== RENDER =====
 function initials(name){
   return name.replace(/\(.*?\)/g,'').trim().split(/\s+/).map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';
 }
@@ -230,94 +360,14 @@ function switchTab(id){
   if(tab) tab.classList.add('active');
 }
 
-function handleFile(input){
-  const file=input.files[0];
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try{
-      const wb=XLSX.read(e.target.result,{type:'array'});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      const headers=raw[2]||[];
-
-      // Build column index: match name -> col index
-      const matchColMap={};
-      for(let c=0;c<headers.length;c++){
-        const h=String(headers[c]);
-        if(h.includes('–')) matchColMap[h]=c;
-      }
-
-      // Find result rows (actual match results, not player tips)
-      // Results are stored in the Excel — we look for a dedicated result row
-      // In this Excel format, results appear as part of player rows (score column per match)
-      // We'll extract them from all player data and also look for an actual results row
-
-      // Parse participants
-      const players=[];
-      for(let r=4;r<raw.length;r++){
-        const row=raw[r];
-        if(!row||!row[0]) continue;
-        const name=String(row[0]).trim();
-        if(!name||name.startsWith('Välj')||name.startsWith('OBS')||name.startsWith('REGLER')||
-           name.startsWith('•')||name.startsWith('Om ')||name.startsWith('Swish')||name.match(/^\d\./)) continue;
-        const p={
-          name:name.replace(/\n/g,' ').trim(),
-          malskytt1:String(row[2]||'').trim(),
-          malskytt2:String(row[3]||'').trim(),
-          skytteliga:String(row[4]||'').trim(),
-          assist:String(row[5]||'').trim(),
-          assistliga:String(row[6]||'').trim(),
-          vmvinnare:String(row[7]||'').trim(),
-          matchTips:{},
-          total:0,lastGW:0,
-        };
-        for(const [mName,col] of Object.entries(matchColMap)){
-          const res=String(row[col]||'').trim();
-          const sign=String(row[col+1]||'').trim();
-          if(res||sign) p.matchTips[mName]={res,sign};
-        }
-        players.push(p);
-      }
-
-      // Extract playoff tips per player (cols 203+ for round 1, etc.)
-      // Playoff col headers are in row 2
-      const playoffColHeaders=raw[2]||[];
-
-      appData.players=players;
-      appData.matchColMap=matchColMap;
-      appData.loaded=true;
-
-      renderAll();
-      document.getElementById('header-sub').textContent=`${players.filter(p=>p.vmvinnare||p.malskytt1).length} deltagare · VM 2026`;
-      switchTab('leaderboard');
-    }catch(err){
-      console.error(err);
-      alert('Kunde inte läsa filen: '+err.message);
-    }
-  };
-  reader.readAsArrayBuffer(file);
-  input.value='';
-}
-
-function renderAll(){
-  renderMetrics();
-  renderLeaderboard();
-  renderGroups();
-  renderPlayoff();
-  renderTips();
-}
-
 function renderMetrics(){
-  const ps=appData.players.filter(p=>p.vmvinnare||p.malskytt1);
+  const ps=state.players.filter(p=>p.vmvinnare||p.malskytt1);
   if(!ps.length) return;
   const sorted=[...ps].sort((a,b)=>b.total-a.total);
-  const avg=ps.length?Math.round(ps.reduce((s,p)=>s+p.total,0)/ps.length):0;
-  document.getElementById('metrics').innerHTML=`
-    <div class="metric"><div class="metric-label">Ledare</div><div class="metric-value">${sorted[0]?.name.split(' ')[0]||'–'}</div><div class="metric-sub">${sorted[0]?.total||0} poäng</div></div>
-    <div class="metric"><div class="metric-label">Deltagare</div><div class="metric-value">${ps.length}</div><div class="metric-sub">har lämnat tips</div></div>
-    <div class="metric"><div class="metric-label">VM-favorit</div><div class="metric-value" style="font-size:14px">${getMostPicked(ps,'vmvinnare')}</div><div class="metric-sub">vanligaste tipset</div></div>
-    <div class="metric"><div class="metric-label">Snitt</div><div class="metric-value">${avg}</div><div class="metric-sub">poäng per person</div></div>`;
+  document.getElementById('m-leader').textContent=sorted[0]?.name.split(' ')[0]||'–';
+  document.getElementById('m-leader-pts').textContent=`${sorted[0]?.total||0} poäng`;
+  document.getElementById('m-players').textContent=ps.length;
+  document.getElementById('m-fav').textContent=getMostPicked(ps,'vmvinnare');
 }
 
 function getMostPicked(players,field){
@@ -329,8 +379,11 @@ function getMostPicked(players,field){
 }
 
 function renderLeaderboard(){
-  const ps=appData.players.filter(p=>p.vmvinnare||p.malskytt1||Object.keys(p.matchTips).length);
-  if(!ps.length) return;
+  const ps=state.players.filter(p=>p.vmvinnare||p.malskytt1||Object.keys(p.matchTips).length);
+  if(!ps.length){
+    document.getElementById('lb-rows').innerHTML='<div class="loading">⏳ Ladda upp ert tips-Excel</div>';
+    return;
+  }
   const sorted=[...ps].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name));
   const maxPts=sorted[0]?.total||1;
   const rows=sorted.map((p,i)=>{
@@ -350,93 +403,147 @@ function renderLeaderboard(){
           <div class="bar-wrap"><div class="bar-fill" style="width:${bar}%;background:${color}"></div></div>
         </div>
       </div>
-      <div class="pts-last">${p.lastGW}</div>
       <div class="pts-total">${p.total}</div>
-      <div class="trend-eq">–</div>
+      <div class="trend-eq">›</div>
     </div>`;
   }).join('');
   document.getElementById('lb-rows').innerHTML=rows;
 }
 
+// ===== GROUPS =====
+const GROUPS_DEF = [
+  {name:'Grupp A',group:'GROUP_A',teams:['Mexiko','Sydafrika','Sydkorea','Tjeckien'],matches:['Mexiko–Sydafrika','Sydkorea–Tjeckien','Tjeckien–Sydafrika','Mexiko–Sydkorea','Tjeckien–Mexiko','Sydafrika–Sydkorea']},
+  {name:'Grupp B',group:'GROUP_B',teams:['Kanada','Qatar','Schweiz','Bosnien & Hercegovina'],matches:['Kanada–Bosnien & Hercegovina','Qatar–Schweiz','Schweiz–Bosnien & Hercegovina','Kanada–Qatar','Schweiz–Kanada','Bosnien & Hercegovina–Qatar']},
+  {name:'Grupp C',group:'GROUP_C',teams:['Brasilien','Haiti','Marocko','Skottland'],matches:['Brasilien–Marocko','Haiti–Skottland','Skottland–Marocko','Brasilien–Haiti','Skottland–Brasilien','Marocko–Haiti']},
+  {name:'Grupp D',group:'GROUP_D',teams:['USA','Paraguay','Australien','Turkiet'],matches:['USA–Paraguay','Australien–Turkiet','USA–Australien','Turkiet–Paraguay','Turkiet–USA','Paraguay–Australien']},
+  {name:'Grupp E',group:'GROUP_E',teams:['Tyskland','Curacao','Elfenbenskusten','Ecuador'],matches:['Tyskland–Curacao','Elfenbenskusten–Ecuador','Tyskland–Elfenbenskusten','Ecuador–Curacao','Curacao–Elfenbenskusten','Ecuador–Tyskland']},
+  {name:'Grupp F',group:'GROUP_F',teams:['Nederländerna','Japan','Sverige','Tunisien'],matches:['Nederländerna–Japan','Sverige–Tunisien','Nederländerna–Sverige','Tunisien–Japan','Japan–Sverige','Tunisien–Nederländerna']},
+  {name:'Grupp G',group:'GROUP_G',teams:['Belgien','Egypten','Iran','Nya Zeeland'],matches:['Belgien–Egypten','Iran–Nya Zeeland','Belgien–Iran','Nya Zeeland–Egypten','Egypten–Iran','Nya Zeeland–Belgien']},
+  {name:'Grupp H',group:'GROUP_H',teams:['Spanien','Kap Verde','Saudiarabien','Uruguay'],matches:['Spanien–Kap Verde','Saudiarabien–Uruguay','Spanien–Saudiarabien','Uruguay–Kap Verde','Kap Verde–Saudiarabien','Uruguay–Spanien']},
+  {name:'Grupp I',group:'GROUP_I',teams:['Frankrike','Senegal','Norge','Irak'],matches:['Frankrike–Senegal','Norge–Irak','Frankrike–Irak','Norge–Senegal','Norge–Frankrike','Senegal–Irak']},
+  {name:'Grupp J',group:'GROUP_J',teams:['Argentina','Algeriet','Österrike','Jordanien'],matches:['Argentina–Algeriet','Österrike–Jordanien','Argentina–Österrike','Jordanien–Algeriet','Algeriet–Österrike','Jordanien–Argentina']},
+  {name:'Grupp K',group:'GROUP_K',teams:['Portugal','Kongo','Uzbekistan','Colombia'],matches:['Portugal–Kongo','Uzbekistan–Colombia','Portugal–Uzbekistan','Colombia–Kongo','Colombia–Portugal','Kongo–Uzbekistan']},
+  {name:'Grupp L',group:'GROUP_L',teams:['England','Kroatien','Ghana','Panama'],matches:['England–Kroatien','Ghana–Panama','England–Ghana','Panama–Kroatien','Panama–England','Kroatien–Ghana']},
+];
+
 function renderGroups(){
-  const results=appData.matchResults||{};
-  const html=GROUPS.map((g,gi)=>{
+  const html=GROUPS_DEF.map((g,gi)=>{
     const color=COLORS[gi%COLORS.length];
     const teamChips=g.teams.map(t=>`<div class="team-chip">${t}</div>`).join('');
+
     const matchRows=g.matches.map(m=>{
-      const dashIdx=m.indexOf('–');
-      const home=dashIdx>=0?m.slice(0,dashIdx).trim():m;
-      const away=dashIdx>=0?m.slice(dashIdx+1).trim():'';
-      const result=results[m];
-      const scoreHtml=result
-        ?`<div class="match-score score-done">${result}</div>`
-        :`<div class="match-score score-pending">vs</div>`;
-      return `<div class="match-row">
-        <div class="match-home">${home}</div>
-        ${scoreHtml}
-        <div class="match-away">${away}</div>
-      </div>`;
+      const di=m.indexOf('–');
+      const home=di>=0?m.slice(0,di).trim():m;
+      const away=di>=0?m.slice(di+1).trim():'';
+      const res=state.matchResults?.[m];
+      let scoreHtml;
+      if(res?.status==='FINISHED'&&res.scoreH!==null){
+        scoreHtml=`<div class="match-score score-done">${res.scoreH}–${res.scoreA}</div>`;
+      } else if(res?.status==='IN_PLAY'||res?.status==='PAUSED'||res?.status==='LIVE'){
+        const s=res.scoreH!==null?`${res.scoreH}–${res.scoreA}`:'0–0';
+        scoreHtml=`<div class="match-score score-live">🔴 ${s}</div>`;
+      } else {
+        scoreHtml=`<div class="match-score score-pending">vs</div>`;
+      }
+      return `<div class="match-row"><div class="match-home">${home}</div>${scoreHtml}<div class="match-away">${away}</div></div>`;
     }).join('');
+
+    // Grupptabell från API
+    let standingsHtml='';
+    const apiGroup=g.group;
+    const table=state.standings[apiGroup];
+    if(table&&table.length){
+      const rows=table.map((t,i)=>{
+        const name=toSwe(t.team?.shortName||t.team?.name||'');
+        const rowClass=i<2?'standings-row qualified':'standings-row';
+        const posClass=i===2?'standings-pos q3':'standings-pos';
+        return `<div class="${rowClass}">
+          <div style="display:flex;align-items:center;gap:5px;min-width:0">
+            <div class="${posClass}">${i+1}</div>
+            <div class="standings-name">${name}</div>
+          </div>
+          <div class="standings-num">${t.playedGames}</div>
+          <div class="standings-num">${t.won}</div>
+          <div class="standings-num">${t.draw}</div>
+          <div class="standings-num">${t.lost}</div>
+          <div class="standings-num">${t.goalsFor}-${t.goalsAgainst}</div>
+          <div class="standings-pts">${t.points}</div>
+        </div>`;
+      }).join('');
+      standingsHtml=`<div class="group-standings">
+        <div class="standings-head"><div>Lag</div><div>S</div><div>V</div><div>O</div><div>F</div><div>M</div><div>P</div></div>
+        ${rows}
+      </div>`;
+    }
+
     return `<div class="group-card">
-      <div class="group-header" style="background:${color}">
-        <span>${g.name}</span>
-        <span style="font-size:11px;opacity:.85">${g.teams.length} lag</span>
-      </div>
+      <div class="group-header" style="background:${color}"><span>${g.name}</span><span style="font-size:11px;opacity:.85">${g.teams.length} lag</span></div>
       <div class="group-teams">${teamChips}</div>
       <div>${matchRows}</div>
+      ${standingsHtml}
     </div>`;
   }).join('');
   document.getElementById('groups-grid').innerHTML=html;
 }
 
+function renderGroupsStatic(){renderGroups();}
+
 function renderPlayoff(){
-  const rounds=[
-    {name:'Omgång av 32 → 16', label:'32 lag som går till 16-delsfinal (1p/rätt)', slots:32},
-    {name:'Omgång av 16 → 8', label:'16 lag som går till åttondelsfinalen (1p/rätt)', slots:16},
-    {name:'Kvartsfinal → 4', label:'8 lag som går till kvartsfinalen (1p/rätt)', slots:8},
-    {name:'Semifinal → 2', label:'4 lag som går till semifialen (1p/rätt)', slots:4},
-    {name:'Final', label:'2 lag som går till finalen (1p/rätt)', slots:2},
+  if(!state.matches.length){renderPlayoffStatic();return;}
+  const stages=[
+    {key:'ROUND_OF_32',name:'Omgång av 32 (→16-delsfinal)'},
+    {key:'ROUND_OF_16',name:'Åttondelsfinaler'},
+    {key:'QUARTER_FINALS',name:'Kvartsfinaler'},
+    {key:'SEMI_FINALS',name:'Semifinaler'},
+    {key:'THIRD_PLACE',name:'Bronsmatch'},
+    {key:'FINAL',name:'Final'},
   ];
-  const html=rounds.map(r=>`
-    <div class="playoff-section">
-      <div class="playoff-title">${r.name}</div>
-      <div style="font-size:11px;color:var(--soft);margin-bottom:8px">${r.label}</div>
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;font-size:13px;color:var(--soft);text-align:center">
-        Resultat fylls i när slutspelet börjar
-      </div>
-    </div>`).join('');
+  let html='';
+  for(const stage of stages){
+    const ms=state.matches.filter(m=>m.stage===stage.key);
+    if(!ms.length) continue;
+    const cards=ms.map(m=>{
+      const h=m.homeTeam?.shortName||m.homeTeam?.name||'TBD';
+      const a=m.awayTeam?.shortName||m.awayTeam?.name||'TBD';
+      const hSwe=toSwe(h);
+      const aSwe=toSwe(a);
+      const score=m.score?.fullTime;
+      const fin=m.status==='FINISHED';
+      const live=m.status==='IN_PLAY'||m.status==='PAUSED';
+      let hClass='playoff-team'+(fin&&score?.home>score?.away?' winner':fin?' loser':h==='TBD'?' tbd':'');
+      let aClass='playoff-team'+(fin&&score?.away>score?.home?' winner':fin?' loser':a==='TBD'?' tbd':'');
+      const scoreStr=fin&&score?.home!==null?`${score.home}–${score.away}`:live?'🔴':'';
+      return `<div class="playoff-match">
+        <div class="${hClass}">${hSwe}<span class="playoff-score">${fin?score?.home??'':''}</span></div>
+        <div class="${aClass}">${aSwe}<span class="playoff-score">${fin?score?.away??'':''}</span></div>
+      </div>`;
+    }).join('');
+    html+=`<div class="playoff-round"><div class="playoff-round-title">${stage.name}</div><div class="playoff-grid">${cards}</div></div>`;
+  }
+  if(!html) html='<div class="empty"><div class="empty-icon">🏆</div>Slutspelet börjar när gruppspelet är klart</div>';
   document.getElementById('playoff-content').innerHTML=html;
 }
 
-function renderTips(){
-  const ps=appData.players.filter(p=>p.vmvinnare||p.malskytt1);
-  if(!ps.length) return;
-  const sorted=[...ps].sort((a,b)=>b.total-a.total);
-  const rows=sorted.map((p,i)=>{
-    const color=COLORS[i%COLORS.length];
-    return `<div class="lb" style="margin-bottom:10px;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border)">
-        <div class="avatar" style="background:${color}20;color:${color};width:26px;height:26px;font-size:10px">${initials(p.name)}</div>
-        <span style="font-weight:700;font-size:13px">${escHtml(p.name)}</span>
-        <span style="font-size:12px;color:var(--soft);margin-left:auto">${p.total}p</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));padding:10px 14px;gap:8px;font-size:12px">
-        <div><span style="color:var(--soft)">VM-vinnare:</span> <strong>${p.vmvinnare||'–'}</strong></div>
-        <div><span style="color:var(--soft)">Skytteliga:</span> <strong>${p.skytteliga||'–'}</strong></div>
-        <div><span style="color:var(--soft)">Målskytt 1:</span> <strong>${p.malskytt1||'–'}</strong></div>
-        <div><span style="color:var(--soft)">Målskytt 2:</span> <strong>${p.malskytt2||'–'}</strong></div>
-        <div><span style="color:var(--soft)">Assistspelare:</span> <strong>${p.assist||'–'}</strong></div>
-        <div><span style="color:var(--soft)">Assistliga:</span> <strong>${p.assistliga||'–'}</strong></div>
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('tips-content').innerHTML=rows;
+function renderPlayoffStatic(){
+  const rounds=[
+    {name:'Omgång av 32 → 16-delsfinal'},
+    {name:'Åttondelsfinaler'},
+    {name:'Kvartsfinaler'},
+    {name:'Semifinaler'},
+    {name:'Final'},
+  ];
+  document.getElementById('playoff-content').innerHTML=rounds.map(r=>`
+    <div class="playoff-round">
+      <div class="playoff-round-title">${r.name}</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;font-size:13px;color:var(--soft);text-align:center">Väntar på matchdata...</div>
+    </div>`).join('');
 }
 
+// ===== PLAYER DETAIL =====
 function showDetail(name){
-  const p=appData.players.find(x=>x.name===name);
+  const p=state.players.find(x=>x.name===name);
   if(!p) return;
-  const idx=appData.players.filter(x=>x.vmvinnare||x.malskytt1).sort((a,b)=>b.total-a.total).findIndex(x=>x.name===name);
+  const idx=state.players.sort((a,b)=>b.total-a.total).findIndex(x=>x.name===name);
   const color=COLORS[Math.max(0,idx)%COLORS.length];
   const indivRows=[
     ['Målskytt 1',p.malskytt1,'1p/mål'],
@@ -448,10 +555,23 @@ function showDetail(name){
   ].map(([label,val,pts])=>`
     <div class="detail-item">
       <div class="detail-item-label">${label} <span style="font-weight:400;color:var(--soft)">(${pts})</span></div>
-      <div class="detail-item-val">${val||'<span style="color:var(--soft)">–</span>'}</div>
+      <div class="detail-item-val">${escHtml(val)||'<span style="color:var(--soft)">–</span>'}</div>
     </div>`).join('');
-  const matchRows=Object.entries(p.matchTips).map(([match,tip])=>`
-    <tr><td>${match}</td><td class="tip-val">${tip.res||'–'}</td><td class="tip-val">${tip.sign||'–'}</td></tr>`).join('');
+
+  const matchRows=Object.entries(p.matchTips).map(([match,tip])=>{
+    const res=state.matchResults?.[match];
+    const fin=res?.status==='FINISHED';
+    const pts=p.breakdown?.[match]||0;
+    const ptsHtml=fin?(pts>0?`<span class="pts-badge pts-green">+${pts}p</span>`:`<span class="pts-badge pts-red">0p</span>`):'';
+    const actualScore=fin&&res.scoreH!==null?`${res.scoreH}–${res.scoreA}`:'';
+    return `<tr>
+      <td>${match}${ptsHtml}</td>
+      <td class="tip-${fin?(pts>=3?'correct':'wrong'):'pending'}">${tip.res||'–'}</td>
+      <td>${tip.sign||'–'}</td>
+      <td style="color:var(--soft);font-size:11px">${actualScore}</td>
+    </tr>`;
+  }).join('');
+
   document.getElementById('detail-content').innerHTML=`
     <div class="detail-card">
       <div class="detail-header">
@@ -464,16 +584,113 @@ function showDetail(name){
     <div class="section-label" style="margin-top:1rem">Mattips</div>
     <div class="lb" style="overflow-x:auto">
       <table class="tips-table">
-        <thead><tr><th>Match</th><th>Resultat</th><th>Tecken</th></tr></thead>
+        <thead><tr><th>Match</th><th>Tips</th><th>Tecken</th><th>Facit</th></tr></thead>
         <tbody>${matchRows}</tbody>
       </table>
     </div>`:''}`;
   switchTab('detail');
 }
 
-function escHtml(s){
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// ===== TIPS PAGE =====
+function renderTips(){
+  const ps=state.players.filter(p=>p.vmvinnare||p.malskytt1);
+  if(!ps.length) return;
+  const sorted=[...ps].sort((a,b)=>b.total-a.total);
+  const rows=sorted.map((p,i)=>{
+    const color=COLORS[i%COLORS.length];
+    return `<div class="lb" style="margin-bottom:10px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border)">
+        <div class="avatar" style="background:${color}20;color:${color};width:26px;height:26px;font-size:10px">${initials(p.name)}</div>
+        <span style="font-weight:700;font-size:13px">${escHtml(p.name)}</span>
+        <span style="font-size:12px;color:var(--soft);margin-left:auto">${p.total}p</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));padding:10px 14px;gap:8px;font-size:12px">
+        <div><span style="color:var(--soft)">VM-vinnare:</span> <strong>${escHtml(p.vmvinnare)||'–'}</strong></div>
+        <div><span style="color:var(--soft)">Skytteliga:</span> <strong>${escHtml(p.skytteliga)||'–'}</strong></div>
+        <div><span style="color:var(--soft)">Målskytt 1:</span> <strong>${escHtml(p.malskytt1)||'–'}</strong></div>
+        <div><span style="color:var(--soft)">Målskytt 2:</span> <strong>${escHtml(p.malskytt2)||'–'}</strong></div>
+        <div><span style="color:var(--soft)">Assistspelare:</span> <strong>${escHtml(p.assist)||'–'}</strong></div>
+        <div><span style="color:var(--soft)">Assistliga:</span> <strong>${escHtml(p.assistliga)||'–'}</strong></div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('tips-content').innerHTML=rows;
 }
+
+// ===== EXCEL IMPORT =====
+function handleFile(input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const headers=raw[2]||[];
+      const matchColMap={};
+      for(let c=0;c<headers.length;c++){
+        const h=String(headers[c]);
+        if(h.includes('–')) matchColMap[h]=c;
+      }
+      const players=[];
+      for(let r=4;r<raw.length;r++){
+        const row=raw[r];
+        if(!row||!row[0]) continue;
+        const name=String(row[0]).trim();
+        if(!name||name.startsWith('Välj')||name.startsWith('OBS')||name.startsWith('REGLER')||
+           name.startsWith('•')||name.startsWith('Om ')||name.startsWith('Swish')||name.match(/^\d\./)) continue;
+        const p={
+          name:name.replace(/\n/g,' ').trim(),
+          malskytt1:String(row[2]||'').trim(),
+          malskytt2:String(row[3]||'').trim(),
+          skytteliga:String(row[4]||'').trim(),
+          assist:String(row[5]||'').trim(),
+          assistliga:String(row[6]||'').trim(),
+          vmvinnare:String(row[7]||'').trim(),
+          matchTips:{},total:0,breakdown:{},
+        };
+        for(const [mName,col] of Object.entries(matchColMap)){
+          const res=String(row[col]||'').trim();
+          const sign=String(row[col+1]||'').trim();
+          if(res||sign) p.matchTips[mName]={res,sign};
+        }
+        players.push(p);
+      }
+      state.players=players;
+      if(state.apiOk) calcAllScores();
+      document.getElementById('header-sub').textContent=`${players.filter(p=>p.vmvinnare||p.malskytt1).length} deltagare · VM 2026`;
+      renderLeaderboard();
+      renderMetrics();
+      renderTips();
+      switchTab('leaderboard');
+    }catch(err){
+      alert('Kunde inte läsa filen: '+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value='';
+}
+
+function escHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ===== INIT =====
+async function init(){
+  await loadMatchData();
+  // Uppdatera automatiskt var 60:e sekund
+  setInterval(async()=>{
+    await loadMatchData();
+  }, REFRESH_MS);
+}
+
+init();
 </script>
 </body>
 </html>
+HTMLEOF
+echo "Done $(wc -c < /mnt/user-data/outputs/vm2026.html) bytes"
+Output
+
+Done 35925 bytes
