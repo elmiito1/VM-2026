@@ -687,7 +687,7 @@ function renderPlayoffTips(){
     const sorted=Object.values(teamCounts).sort((a,b)=>b.players.length-a.players.length);
     const cards=sorted.map(t=>{
       const cls=t.correct===true?'correct':t.correct===false?'wrong':'pending';
-      const bgColor=t.correct===true?'background:var(--green-mid);':'t.correct===false?background:#fee2e2;':'';
+      // bgColor unused, handled by CSS class
       return `<div class="playoff-tip-card">
         <div class="playoff-tip-team ${cls}">${t.tip} <span style="font-size:10px;color:var(--soft)">${t.players.length}×</span></div>
         <div class="playoff-tip-tippers">${t.players.join(', ')}</div>
