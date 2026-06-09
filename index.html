@@ -303,7 +303,8 @@ function calcAllScores() {
 
     // Mattips
     for (const [matchKey, tip] of Object.entries(p.matchTips)) {
-      const result = state.matchResults[matchKey];
+      const normalKey = normalizeDash(matchKey);
+      const result = state.matchResults[normalKey] || state.matchResults[matchKey];
       if (!result || result.status !== 'FINISHED') continue;
       if (result.scoreH === null) continue;
 
@@ -332,9 +333,23 @@ function calcAllScores() {
 
 function parseTipScore(s) {
   if (!s) return null;
-  const m = String(s).match(/(\d+)\s*[-–]\s*(\d+)/);
+  const str = String(s).trim();
+  // Filter out Excel date numbers (large numbers like 46023)
+  if (/^\d{5,}$/.test(str)) return null;
+  const m = str.match(/(\d+)\s*[-–]\s*(\d+)/);
   if (!m) return null;
   return {h: parseInt(m[1]), a: parseInt(m[2])};
+}
+
+function normalizeDash(s) {
+  // Normalize all dash variants to em-dash
+  return String(s).replace(/\s*[-–]\s*/g, '–').trim();
+}
+
+function isExcelDate(val) {
+  // Excel dates are 5-digit numbers (40000-50000 range covers 2009-2036)
+  const n = parseFloat(val);
+  return !isNaN(n) && n > 40000 && n < 60000 && String(val).trim().match(/^\d+(\.0)?$/);
 }
 
 function getSign(h, a) {
@@ -562,10 +577,12 @@ function showDetail(name){
     const pts=p.breakdown?.[match]||0;
     const ptsHtml=fin?(pts>0?`<span class="pts-badge pts-green">+${pts}p</span>`:`<span class="pts-badge pts-red">0p</span>`):'';
     const actualScore=fin&&res.scoreH!==null?`${res.scoreH}–${res.scoreA}`:'';
+    const displayRes=isExcelDate(tip.res)?'–':(tip.res||'–');
+    const displaySign=(tip.sign||'').trim().toUpperCase()||'–';
     return `<tr>
       <td>${match}${ptsHtml}</td>
-      <td class="tip-${fin?(pts>=3?'correct':'wrong'):'pending'}">${tip.res||'–'}</td>
-      <td>${tip.sign||'–'}</td>
+      <td class="tip-${fin?(pts>=3?'correct':'wrong'):'pending'}">${displayRes}</td>
+      <td>${displaySign}</td>
       <td style="color:var(--soft);font-size:11px">${actualScore}</td>
     </tr>`;
   }).join('');
