@@ -348,8 +348,19 @@ function normalizeDash(s) {
 
 function isExcelDate(val) {
   // Excel dates are 5-digit numbers (40000-50000 range covers 2009-2036)
-  const n = parseFloat(val);
-  return !isNaN(n) && n > 40000 && n < 60000 && String(val).trim().match(/^\d+(\.0)?$/);
+  // Must be a plain integer, NOT a score like "1-1" or "2-0"
+  const str = String(val).trim();
+  if (str.includes('-') || str.includes('–')) return false; // it's a score, not a date
+  const n = parseFloat(str);
+  return !isNaN(n) && n > 40000 && n < 60000 && /^\d+(\.0)?$/.test(str);
+}
+
+function formatScore(val) {
+  if (!val) return '–';
+  const str = String(val).trim();
+  if (isExcelDate(str)) return '–';
+  // Normalize dash variants for display
+  return str.replace(/\s*–\s*/g, '–').replace(/\s*-\s*/g, '–') || '–';
 }
 
 function getSign(h, a) {
@@ -577,7 +588,7 @@ function showDetail(name){
     const pts=p.breakdown?.[match]||0;
     const ptsHtml=fin?(pts>0?`<span class="pts-badge pts-green">+${pts}p</span>`:`<span class="pts-badge pts-red">0p</span>`):'';
     const actualScore=fin&&res.scoreH!==null?`${res.scoreH}–${res.scoreA}`:'';
-    const displayRes=isExcelDate(tip.res)?'–':(tip.res||'–');
+    const displayRes=formatScore(tip.res);
     const displaySign=(tip.sign||'').trim().toUpperCase()||'–';
     return `<tr>
       <td>${match}${ptsHtml}</td>
