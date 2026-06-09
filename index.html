@@ -428,17 +428,6 @@ function formatScore(val){
 function getSign(h,a){if(h===null||a===null) return null;if(h>a) return '1';if(h<a) return '2';return 'X';}
 
 // ===== RENDER =====
-function initials2(n){return n.replace(/\(.*?\)/g,'').trim().split(/\s+/).map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';}
-
-function switchTab(id){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
-  const page=document.getElementById('page-'+id);
-  if(page) page.classList.add('active');
-  const tab=document.querySelector('[data-tab="'+id+'"]');
-  if(tab) tab.classList.add('active');
-}
-
 function renderMetrics(){
   const ps=state.players.filter(p=>p.vmvinnare||p.malskytt1);
   if(!ps.length) return;
