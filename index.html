@@ -287,6 +287,7 @@ async function loadMatchData() {
   renderPlayoff();
   renderLeaderboard();
   renderMetrics();
+  renderTips();
 
   // Räkna matchstatistik
   const played = state.matches.filter(m=>m.status==='FINISHED').length;
@@ -715,6 +716,9 @@ async function loadTipsFromGitHub(){
     }
     state.players = players;
     document.getElementById('header-sub').textContent = `${players.filter(p=>p.vmvinnare||p.malskytt1).length} deltagare · VM 2026`;
+    renderLeaderboard();
+    renderMetrics();
+    renderTips();
     console.log('Tips laddade automatiskt från tips.xlsx:', players.length, 'deltagare');
   } catch(e) {
     console.log('Ingen tips.xlsx hittad, väntar på manuell uppladdning.');
@@ -722,10 +726,13 @@ async function loadTipsFromGitHub(){
 }
 
 async function init(){
-  // Ladda tips automatiskt från GitHub
-  await loadTipsFromGitHub();
-  // Hämta live matchdata
-  await loadMatchData();
+  // Ladda tips och matchdata parallellt för snabbare start
+  await Promise.all([loadTipsFromGitHub(), loadMatchData()]);
+  // Räkna om poäng nu när båda är klara
+  if (state.players.length && state.apiOk) calcAllScores();
+  renderLeaderboard();
+  renderMetrics();
+  renderTips();
   // Uppdatera automatiskt var 60:e sekund
   setInterval(async()=>{
     await loadMatchData();
