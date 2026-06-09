@@ -646,17 +646,32 @@ function renderPlayoffTips(){
         else if(actualTeam) tippersWrong.push(p.name.split(' ')[0]);
         else tippersCorrect.push(p.name.split(' ')[0]);
       }
-      const actualStr=actualTeam?toSwe(actualTeam):'?';
-      const chips=[
-        ...tippersCorrect.map(t=>`<span class="tipper-chip" style="background:var(--green-mid);color:#065f46">${t}</span>`),
-        ...tippersWrong.map(t=>`<span class="tipper-chip" style="background:#fee2e2;color:#991b1b">${t}</span>`)
-      ].join('');
+      // Build map of tip -> list of players who tipped it
+      const tipMap={};
+      for(const p of state.players){
+        const tip=(p.groupTips?.[gi]?.[pi]||'').trim();
+        if(!tip) continue;
+        if(!tipMap[tip]) tipMap[tip]=[];
+        tipMap[tip].push(p.name.split(' ')[0]);
+      }
+      const actualStr=actualTeam?toSwe(actualTeam):'Ej spelat';
+      // Sort tips by count
+      const sortedTips=Object.entries(tipMap).sort((a,b)=>b[1].length-a[1].length);
+      const chips=sortedTips.map(([tip,players])=>{
+        const isCorrect=actualTeam&&teamMatch(tip,actualTeam);
+        const isWrong=actualTeam&&!isCorrect;
+        const bg=isCorrect?'background:var(--green-mid);color:#065f46':isWrong?'background:#fee2e2;color:#991b1b':'background:var(--bg);color:var(--mid)';
+        return `<div style="display:flex;align-items:center;gap:5px;padding:3px 0">
+          <span style="font-size:11px;font-weight:600;min-width:80px;${bg.split(';')[0]};padding:1px 7px;border-radius:10px;${bg.split(';')[1]}">${tip}</span>
+          <span style="font-size:10px;color:var(--soft)">${players.join(', ')}</span>
+        </div>`;
+      }).join('');
       return `<div style="padding:7px 14px;border-top:1px solid var(--border);font-size:12px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
           <span style="color:var(--soft);font-weight:600">${pos}</span>
-          <span style="font-weight:600;color:${actualTeam?'var(--text)':'var(--soft)'}">${actualStr}</span>
+          <span style="font-size:11px;font-weight:600;color:${actualTeam?'var(--green)':'var(--soft)'}">${actualStr}</span>
         </div>
-        <div class="tippers-chips">${chips||'<span style="color:var(--soft);font-size:10px">Ingen har tippar</span>'}</div>
+        ${chips||'<span style="color:var(--soft);font-size:10px">Inga tips</span>'}
       </div>`;
     }).join('');
     html+=`<div class="group-card">
