@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VM 2026 Betting</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --green: #1a6b3c;
+    --green-light: #f0faf4;
+    --green-mid: #d1fae5;
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --text-mid: #4b5563;
+    --text-soft: #9ca3af;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* Header */
+  .header { background: var(--green); color: #fff; padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .header-logo { font-size: 22px; }
+  .header-title { font-size: 17px; font-weight: 600; }
+  .header-sub { font-size: 12px; opacity: .75; margin-top: 1px; }
+  .upload-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); border-radius: var(--radius-sm); font-size: 13px; color: #fff; cursor: pointer; font-family: inherit; transition: background .15s; }
+  .upload-btn:hover { background: rgba(255,255,255,.25); }
+  input[type=file] { display: none; }
+
+  /* Nav tabs */
+  .nav { background: var(--card); border-bottom: 1px solid var(--border); display: flex; padding: 0 1.25rem; overflow-x: auto; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav-tab { padding: 13px 16px; font-size: 13px; font-weight: 500; color: var(--text-soft); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: color .15s; }
+  .nav-tab.active { color: var(--green); border-bottom-color: var(--green); }
+  .nav-tab:hover:not(.active) { color: var(--text-mid); }
+
+  /* Page sections */
+  .page { display: none; padding: 1.25rem; max-width: 700px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* Metric cards */
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+  .metric { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .metric-label { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 4px; }
+  .metric-value { font-size: 21px; font-weight: 600; color: var(--text); }
+  .metric-sub { font-size: 11px; color: var(--text-soft); margin-top: 2px; }
+
+  /* Section heading */
+  .section-label { font-size: 11px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: .7px; margin-bottom: 10px; }
+
+  /* Leaderboard */
+  .leaderboard { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .lb-head { display: grid; grid-template-columns: 36px 1fr 56px 64px 30px; gap: 8px; padding: 9px 14px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 10px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: .5px; }
+  .lb-row { display: grid; grid-template-columns: 36px 1fr 56px 64px 30px; gap: 8px; padding: 11px 14px; border-top: 1px solid var(--border); align-items: center; transition: background .1s; }
+  .lb-row:first-child { border-top: none; }
+  .lb-row:hover { background: #fafafa; }
+  .lb-row.gold { background: linear-gradient(90deg, #fffbeb 0%, var(--card) 100%); }
+  .rank { font-size: 13px; font-weight: 600; text-align: center; color: var(--text-soft); }
+  .rank.r1 { color: #b45309; }
+  .rank.r2 { color: #6b7280; }
+  .rank.r3 { color: #92400e; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+  .player-wrap { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .player-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; }
+  .pts-last { font-size: 13px; text-align: right; color: var(--text-mid); }
+  .pts-total { font-size: 14px; font-weight: 600; text-align: right; color: var(--green); }
+  .trend-up { color: var(--green); font-size: 13px; text-align: center; }
+  .trend-dn { color: #ef4444; font-size: 13px; text-align: center; }
+  .trend-eq { color: var(--text-soft); font-size: 13px; text-align: center; }
+
+  /* Match cards */
+  .match-list { display: flex; flex-direction: column; gap: 10px; }
+  .match-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .match-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .match-name { font-size: 14px; font-weight: 600; }
+  .match-meta { font-size: 12px; color: var(--text-soft); margin-top: 2px; }
+  .badge { font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+  .badge-live { background: #fef3c7; color: #92400e; }
+  .badge-done { background: var(--green-mid); color: #065f46; }
+  .badge-soon { background: #f3f4f6; color: var(--text-soft); }
+  .score-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .score-chip { display: flex; align-items: center; gap: 4px; padding: 3px 9px; background: var(--bg); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; }
+  .chip-name { color: var(--text-soft); }
+  .chip-pts { font-weight: 600; color: var(--text); }
+  .chip-pts.best { color: var(--green); }
+
+  /* Upload page */
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 2.5rem 1.5rem; text-align: center; cursor: pointer; margin-bottom: 1.5rem; transition: background .15s, border-color .15s; }
+  .upload-zone:hover { background: var(--green-light); border-color: var(--green); }
+  .upload-icon { font-size: 36px; margin-bottom: 10px; }
+  .upload-title { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+  .upload-hint { font-size: 13px; color: var(--text-soft); }
+  .format-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; font-size: 13px; color: var(--text-mid); line-height: 1.7; }
+  .format-box code { font-family: monospace; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; color: var(--text); }
+  .format-example { margin-top: 12px; background: var(--bg); border-radius: var(--radius-sm); padding: 10px 12px; font-family: monospace; font-size: 11px; color: var(--text-mid); overflow-x: auto; white-space: pre; border: 1px solid var(--border); }
+  .status-msg { margin-top: 12px; font-size: 13px; padding: 10px 14px; border-radius: var(--radius-sm); }
+  .status-ok { background: var(--green-light); color: #065f46; border: 1px solid #a7f3d0; }
+  .status-err { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+  /* Instructions */
+  .instructions { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .instr-step { display: flex; gap: 14px; padding: 16px 18px; border-top: 1px solid var(--border); }
+  .instr-step:first-child { border-top: none; }
+  .step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--green); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .step-title { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .step-desc { font-size: 12px; color: var(--text-mid); line-height: 1.5; }
+  .step-desc a { color: var(--green); }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 3rem 1rem; color: var(--text-soft); font-size: 14px; }
+  .empty-icon { font-size: 40px; margin-bottom: 10px; opacity: .4; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">🏆</div>
+    <div>
+      <div class="header-title">VM 2026 Betting</div>
+      <div class="header-sub" id="header-sub">Ladda upp ert Excel för att börja</div>
+    </div>
+  </div>
+  <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+    📤 Ladda upp Excel
+  </button>
+  <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(this)">
+</div>
+
+<nav class="nav">
+  <div class="nav-tab active" data-tab="leaderboard" onclick="switchTab('leaderboard')">🥇 Ledartavla</div>
+  <div class="nav-tab" data-tab="matches" onclick="switchTab('matches')">⚽ Matcher</div>
+  <div class="nav-tab" data-tab="howto" onclick="switchTab('howto')">📋 Kom igång</div>
+</nav>
+
+<!-- LEADERBOARD -->
+<div id="page-leaderboard" class="page active">
+  <div class="metrics" id="metrics">
+    <div class="metric"><div class="metric-label">Ledare</div><div class="metric-value">–</div><div class="metric-sub">Ingen data än</div></div>
+    <div class="metric"><div class="metric-label">Matcher</div><div class="metric-value">–</div><div class="metric-sub">spelade</div></div>
+    <div class="metric"><div class="metric-label">Deltagare</div><div class="metric-value">–</div><div class="metric-sub">i ligan</div></div>
+    <div class="metric"><div class="metric-label">Snitt</div><div class="metric-value">–</div><div class="metric-sub">poäng per person</div></div>
+  </div>
+  <div class="section-label">Ställning</div>
+  <div class="leaderboard">
+    <div class="lb-head">
+      <div style="text-align:center">#</div>
+      <div>Deltagare</div>
+      <div style="text-align:right">Senast</div>
+      <div style="text-align:right">Totalt</div>
+      <div></div>
+    </div>
+    <div id="lb-rows">
+      <div class="empty"><div class="empty-icon">📊</div>Ladda upp ert Excel under "Kom igång" för att se ställningen</div>
+    </div>
+  </div>
+</div>
+
+<!-- MATCHES -->
+<div id="page-matches" class="page">
+  <div id="match-list">
+    <div class="empty"><div class="empty-icon">⚽</div>Inga matcher att visa ännu</div>
+  </div>
+</div>
+
+<!-- HOW TO -->
+<div id="page-howto" class="page">
+  <div class="section-label">Kom igång</div>
+  <div class="instructions" style="margin-bottom:1.5rem">
+    <div class="instr-step">
+      <div class="step-num">1</div>
+      <div><div class="step-title">Skapa ett GitHub-konto</div><div class="step-desc">Gå till <a href="https://github.com" target="_blank">github.com</a> och skapa ett gratis konto om du inte har ett.</div></div>
+    </div>
+    <div class="instr-step">
+      <div class="step-num">2</div>
+      <div><div class="step-title">Ladda upp den här filen</div><div class="step-desc">Skapa ett nytt repository, klicka "Add file → Upload files" och ladda upp <code>vm2026.html</code>. Döp filen till <code>index.html</code>.</div></div>
+    </div>
+    <div class="instr-step">
+      <div class="step-num">3</div>
+      <div><div class="step-title">Aktivera GitHub Pages</div><div class="step-desc">Gå till Settings → Pages → välj branch <code>main</code> och klicka Save. Din sida är live på <code>dittnamn.github.io/repositoryname</code> inom någon minut.</div></div>
+    </div>
+    <div class="instr-step">
+      <div class="step-num">4</div>
+      <div><div class="step-title">Uppdatera resultaten</div><div class="step-desc">När ni vill uppdatera: ladda upp ett nytt Excel via knappen "Ladda upp Excel" högst upp. Poängen räknas om direkt i webbläsaren – ingen server behövs.</div></div>
+    </div>
+  </div>
+
+  <div class="section-label">Excelformat</div>
+  <div class="format-box">
+    Första raden ska vara kolumnrubriker. Kolumnerna <code>Hemmalag</code>, <code>Bortalag</code> och <code>Datum</code> är obligatoriska. Lägg sedan till en kolumn per deltagare med deras poäng för varje match.
+    <div class="format-example">Match  Datum       Hemmalag  Bortalag  Resultat  Erik  Anna  Johan
+1      2026-06-11  BRA       MEX       2-1       10    5     10
+2      2026-06-11  ARG       NGA       1-0       8     15    8
+3      2026-06-12  FRA       AUS       3-1       0     0     5</div>
+    Kolumnen <code>Resultat</code> är valfri – om den är tom räknas matchen som kommande.
+  </div>
+
+  <div style="margin-top:1.5rem">
+    <div class="section-label">Ladda upp Excel</div>
+    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon">📂</div>
+      <div class="upload-title">Klicka här för att välja fil</div>
+      <div class="upload-hint">.xlsx eller .xls</div>
+    </div>
+    <div id="upload-status"></div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#1a6b3c','#2563eb','#7c3aed','#db2777','#b45309','#0891b2','#059669','#dc2626','#4f46e5','#0d9488'];
+let appData = { players: [], matches: [] };
+
+function switchTab(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelector('[data-tab="' + id + '"]').classList.add('active');
+}
+
+function initials(name) {
+  return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function renderMetrics() {
+  const d = appData;
+  if (!d.players.length) return;
+  const sorted = [...d.players].sort((a, b) => b.total - a.total);
+  const played = d.matches.filter(m => m.status === 'done').length;
+  const avg = Math.round(d.players.reduce((s, p) => s + p.total, 0) / d.players.length);
+  document.getElementById('metrics').innerHTML = `
+    <div class="metric"><div class="metric-label">Ledare</div><div class="metric-value">${sorted[0].name}</div><div class="metric-sub">${sorted[0].total} poäng</div></div>
+    <div class="metric"><div class="metric-label">Matcher</div><div class="metric-value">${played}</div><div class="metric-sub">av ${d.matches.length} spelade</div></div>
+    <div class="metric"><div class="metric-label">Deltagare</div><div class="metric-value">${d.players.length}</div><div class="metric-sub">i ligan</div></div>
+    <div class="metric"><div class="metric-label">Snitt</div><div class="metric-value">${avg}</div><div class="metric-sub">poäng per person</div></div>`;
+  document.getElementById('header-sub').textContent = `${d.players.length} deltagare · ${d.matches.length} matcher`;
+}
+
+function renderLeaderboard() {
+  const sorted = [...appData.players].sort((a, b) => b.total - a.total);
+  if (!sorted.length) return;
+  const maxPts = sorted[0].total || 1;
+  const rows = sorted.map((p, i) => {
+    const rankClass = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
+    const rowClass = i === 0 ? 'lb-row gold' : 'lb-row';
+    const trendHtml = p.trend > 0
+      ? '<span class="trend-up">▲</span>'
+      : p.trend < 0 ? '<span class="trend-dn">▼</span>'
+      : '<span class="trend-eq">–</span>';
+    const bar = Math.round((p.total / maxPts) * 100);
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+    return `<div class="${rowClass}">
+      <div class="rank ${rankClass}">${medal}</div>
+      <div class="player-wrap">
+        <div class="avatar" style="background:${COLORS[i % COLORS.length]}20;color:${COLORS[i % COLORS.length]}">${initials(p.name)}</div>
+        <div style="min-width:0;flex:1">
+          <div class="player-name">${p.name}</div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${bar}%;background:${COLORS[i % COLORS.length]}"></div></div>
+        </div>
+      </div>
+      <div class="pts-last">${p.last}</div>
+      <div class="pts-total">${p.total}</div>
+      <div>${trendHtml}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('lb-rows').innerHTML = rows;
+}
+
+function renderMatches() {
+  if (!appData.matches.length) return;
+  const html = appData.matches.map(m => {
+    const badgeClass = m.status === 'live' ? 'badge-live' : m.status === 'done' ? 'badge-done' : 'badge-soon';
+    const badgeText = m.status === 'live' ? '🔴 Live' : m.status === 'done' ? '✅ Spelad' : '🕐 Kommande';
+    let scoresHtml = '';
+    if (m.status !== 'soon' && Object.keys(m.scores).length) {
+      const vals = Object.values(m.scores).filter(v => v > 0);
+      const best = vals.length ? Math.max(...vals) : -1;
+      scoresHtml = '<div class="score-row">' + Object.entries(m.scores).map(([k, v]) =>
+        `<div class="score-chip"><span class="chip-name">${k}</span><span class="chip-pts ${v === best && v > 0 ? 'best' : ''}">${v}p</span></div>`
+      ).join('') + '</div>';
+    }
+    const resultStr = m.result ? `<span style="font-weight:600;color:#111"> · ${m.result}</span>` : '';
+    return `<div class="match-card">
+      <div class="match-top">
+        <div>
+          <div class="match-name">${m.home} vs ${m.away}${resultStr}</div>
+          <div class="match-meta">${m.date}${m.group ? ' · ' + m.group : ''}</div>
+        </div>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+      </div>
+      ${scoresHtml}
+    </div>`;
+  }).join('');
+  document.getElementById('match-list').innerHTML = html;
+}
+
+function handleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('upload-status');
+  statusEl.innerHTML = '<div class="status-msg" style="background:#f0faf4;color:#065f46;border:1px solid #a7f3d0">Läser filen...</div>';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!rows.length) { statusEl.innerHTML = '<div class="status-msg status-err">Filen verkar tom.</div>'; return; }
+
+      const fixed = ['Match', 'Datum', 'Hemmalag', 'Bortalag', 'Resultat', 'Tid', 'Grupp'];
+      const pKeys = Object.keys(rows[0]).filter(k => !fixed.map(f => f.toLowerCase()).includes(k.toLowerCase()));
+      if (!pKeys.length) { statusEl.innerHTML = '<div class="status-msg status-err">Hittade inga deltagarkolumner. Kontrollera formatet.</div>'; return; }
+
+      const totals = {}, lasts = {};
+      pKeys.forEach(p => { totals[p] = 0; lasts[p] = 0; });
+
+      const matches = rows.map(r => {
+        const home = r.Hemmalag || r.hemmalag || r.Home || r.home || '?';
+        const away = r.Bortalag || r.bortalag || r.Away || r.away || '?';
+        const date = r.Datum || r.datum || r.Date || r.date || '';
+        const result = r.Resultat || r.resultat || r.Result || r.result || '';
+        const group = r.Grupp || r.grupp || r.Group || r.group || '';
+        const scores = {};
+        pKeys.forEach(p => { const v = parseFloat(r[p]) || 0; scores[p] = v; totals[p] += v; lasts[p] = v; });
+        const status = result ? 'done' : 'soon';
+        return { home, away, date, result, group, status, scores };
+      });
+
+      appData.players = pKeys.map((p, i) => ({ name: p, total: totals[p], last: lasts[p], trend: 0, color: COLORS[i % COLORS.length] }));
+      appData.matches = matches;
+
+      renderMetrics();
+      renderLeaderboard();
+      renderMatches();
+
+      statusEl.innerHTML = `<div class="status-msg status-ok">✅ Importerade ${matches.length} matcher och ${pKeys.length} deltagare!</div>`;
+      setTimeout(() => switchTab('leaderboard'), 1000);
+    } catch (err) {
+      statusEl.innerHTML = '<div class="status-msg status-err">Kunde inte läsa filen. Kontrollera att den är i rätt format.</div>';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = '';
+}
+</script>
+</body>
+</html>
