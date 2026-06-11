@@ -375,7 +375,8 @@ function calcAllScores(){
       const tipSign=tip.sign?.trim().toUpperCase();
       if(tipRes&&tipRes.h===res.scoreH&&tipRes.a===res.scoreA) pts+=3;
       const actualSign=getSign(res.scoreH,res.scoreA);
-      const tippedSign=tipRes?getSign(tipRes.h,tipRes.a):tipSign;
+      // Use explicit sign column first, fall back to sign derived from result
+      const tippedSign=tipSign||( tipRes?getSign(tipRes.h,tipRes.a):null);
       if(tippedSign&&tippedSign===actualSign) pts+=1;
       if(pts>0){p.total+=pts;p.breakdown[mKey]=pts;}
     }
