@@ -232,8 +232,35 @@ const TEAM_MAP={
   'england':'England','kroatien':'Croatia','ghana':'Ghana','panama':'Panama',
 };
 
+// Extra English→Swedish mappings for API responses
+const ENG_TO_SWE={
+  'Mexico':'Mexiko','South Africa':'Sydafrika','Korea Republic':'Sydkorea','Czech Republic':'Tjeckien',
+  'Canada':'Kanada','Switzerland':'Schweiz','Bosnia and Herzegovina':'Bosnien & Hercegovina',
+  'Brazil':'Brasilien','Morocco':'Marocko','Scotland':'Skottland',
+  'Australia':'Australien','Turkey':'Turkiet','Germany':'Tyskland',
+  "Côte d'Ivoire":'Elfenbenskusten',"Ivory Coast":'Elfenbenskusten',
+  'Netherlands':'Nederländerna','Sweden':'Sverige','Tunisia':'Tunisien',
+  'Belgium':'Belgien','Egypt':'Egypten','New Zealand':'Nya Zeeland',
+  'Cabo Verde':'Kap Verde','Saudi Arabia':'Saudiarabien',
+  'France':'Frankrike','Norway':'Norge','Iraq':'Irak',
+  'Algeria':'Algeriet','Austria':'Österrike','Jordan':'Jordanien',
+  'Congo':'Kongo','Croatia':'Kroatien','Spain':'Spanien',
+  'England':'England','Portugal':'Portugal','Colombia':'Colombia',
+  'Uruguay':'Uruguay','Argentina':'Argentina','Ghana':'Ghana',
+  'Panama':'Panama','Japan':'Japan','Ecuador':'Ecuador',
+  'Senegal':'Senegal','Iran':'Iran','Paraguay':'Paraguay',
+  'Uzbekistan':'Uzbekistan','Haiti':'Haiti','Qatar':'Qatar',
+};
+
 function toEng(n){return TEAM_MAP[n.toLowerCase()]||n;}
 function toSwe(e){
+  if(!e) return e;
+  // Direct lookup in ENG_TO_SWE map
+  if(ENG_TO_SWE[e]) return ENG_TO_SWE[e];
+  // Try case-insensitive
+  const key=Object.keys(ENG_TO_SWE).find(k=>k.toLowerCase()===e.toLowerCase());
+  if(key) return ENG_TO_SWE[key];
+  // Fallback to TEAM_MAP reverse lookup
   const entry=Object.entries(TEAM_MAP).find(([k,v])=>v.toLowerCase()===e.toLowerCase());
   return entry?entry[0].charAt(0).toUpperCase()+entry[0].slice(1):e;
 }
