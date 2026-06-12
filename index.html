@@ -234,22 +234,29 @@ const TEAM_MAP={
 
 // Extra English→Swedish mappings for API responses
 const ENG_TO_SWE={
-  'Mexico':'Mexiko','South Africa':'Sydafrika','Korea Republic':'Sydkorea','Czech Republic':'Tjeckien',
-  'Canada':'Kanada','Switzerland':'Schweiz','Bosnia and Herzegovina':'Bosnien & Hercegovina',
+  // Exact API shortName values
+  'Mexico':'Mexiko','South Africa':'Sydafrika','Korea Republic':'Sydkorea',
+  'Czechia':'Tjeckien','Czech Republic':'Tjeckien',
+  'Canada':'Kanada','Switzerland':'Schweiz',
+  'Bosnia and Herzegovina':'Bosnien & Hercegovina',
+  'Bosnia-H.':'Bosnien & Hercegovina',
   'Brazil':'Brasilien','Morocco':'Marocko','Scotland':'Skottland',
   'Australia':'Australien','Turkey':'Turkiet','Germany':'Tyskland',
-  "Côte d'Ivoire":'Elfenbenskusten',"Ivory Coast":'Elfenbenskusten',
+  "Côte d'Ivoire":'Elfenbenskusten','Ivory Coast':'Elfenbenskusten',
   'Netherlands':'Nederländerna','Sweden':'Sverige','Tunisia':'Tunisien',
   'Belgium':'Belgien','Egypt':'Egypten','New Zealand':'Nya Zeeland',
-  'Cabo Verde':'Kap Verde','Saudi Arabia':'Saudiarabien',
+  'Cape Verde':'Kap Verde','Cape Verde Islands':'Kap Verde','Cabo Verde':'Kap Verde',
+  'Saudi Arabia':'Saudiarabien',
   'France':'Frankrike','Norway':'Norge','Iraq':'Irak',
   'Algeria':'Algeriet','Austria':'Österrike','Jordan':'Jordanien',
-  'Congo':'Kongo','Croatia':'Kroatien','Spain':'Spanien',
+  'Congo DR':'Kongo','Congo':'Kongo',
+  'Croatia':'Kroatien','Spain':'Spanien',
   'England':'England','Portugal':'Portugal','Colombia':'Colombia',
   'Uruguay':'Uruguay','Argentina':'Argentina','Ghana':'Ghana',
   'Panama':'Panama','Japan':'Japan','Ecuador':'Ecuador',
   'Senegal':'Senegal','Iran':'Iran','Paraguay':'Paraguay',
   'Uzbekistan':'Uzbekistan','Haiti':'Haiti','Qatar':'Qatar',
+  'USA':'USA','United States':'USA',
 };
 
 function toEng(n){return TEAM_MAP[n.toLowerCase()]||n;}
@@ -338,6 +345,10 @@ async function loadMatchData(){
       status:m.status,stage:m.stage,group:m.group,id:m.id};
     state.matchResults[`${hS}–${aS}`]=res;
     state.matchResults[`${hE}–${aE}`]=res;
+    // Also store with full team names for fallback
+    const hFull=m.homeTeam?.name||'';
+    const aFull=m.awayTeam?.name||'';
+    if(hFull) state.matchResults[`${toSwe(hFull)}–${toSwe(aFull)}`]=res;
   }
   // Standings
   const sData=await fetchAPI('/competitions/WC/standings?season=2026');
