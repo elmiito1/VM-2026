@@ -405,10 +405,14 @@ function calcAllScores(){
       let pts=0;
       const tipRes=parseTipScore(tip.res);
       const tipSign=tip.sign?.trim().toUpperCase();
-      if(tipRes&&tipRes.h===res.scoreH&&tipRes.a===res.scoreA) pts+=3;
       const actualSign=getSign(res.scoreH,res.scoreA);
-      // Use explicit sign column first, fall back to sign derived from result
-      const tippedSign=tipSign||( tipRes?getSign(tipRes.h,tipRes.a):null);
+      // Derive sign from tipped result
+      const tipResSign=tipRes?getSign(tipRes.h,tipRes.a):null;
+      // Use explicit sign column first, fall back to sign from result
+      const tippedSign=tipSign||tipResSign;
+      // Correct result = 3p (independent of sign)
+      if(tipRes&&tipRes.h===res.scoreH&&tipRes.a===res.scoreA) pts+=3;
+      // Correct sign = 1p (independent of result)
       if(tippedSign&&tippedSign===actualSign) pts+=1;
       if(pts>0){p.total+=pts;p.breakdown[mKey]=pts;}
     }
@@ -943,9 +947,9 @@ function handleFile(input){
   const reader=new FileReader();
   reader.onload=e=>{
     try{
-      const wb=XLSX.read(e.target.result,{type:'array'});
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:false,raw:true});
       const ws=wb.Sheets[wb.SheetNames[0]];
-      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
       const players=parseExcelPlayers(raw);
       state.players=players;
       if(state.apiOk) calcAllScores();
@@ -963,9 +967,9 @@ async function loadTipsFromGitHub(){
   try{
     const r=await fetch('tips.xlsx');if(!r.ok) return;
     const buf=await r.arrayBuffer();
-    const wb=XLSX.read(buf,{type:'array'});
+    const wb=XLSX.read(buf,{type:'array',cellDates:false,raw:true});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
     const players=parseExcelPlayers(raw);
     state.players=players;
     document.getElementById('header-sub').textContent=`${players.filter(p=>p.vmvinnare||p.malskytt1).length} deltagare · VM 2026`;
