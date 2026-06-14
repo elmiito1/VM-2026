@@ -345,10 +345,24 @@ async function loadMatchData(){
       status:m.status,stage:m.stage,group:m.group,id:m.id};
     state.matchResults[`${hS}–${aS}`]=res;
     state.matchResults[`${hE}–${aE}`]=res;
-    // Also store with full team names for fallback
+    // Store many variants to maximize matching
     const hFull=m.homeTeam?.name||'';
     const aFull=m.awayTeam?.name||'';
     if(hFull) state.matchResults[`${toSwe(hFull)}–${toSwe(aFull)}`]=res;
+    // Store shorthand variants (B&H etc) with both dash types
+    const BH='Bosnien & Hercegovina';
+    const hShort=hS.replace(BH,'B&H');
+    const aShort=aS.replace(BH,'B&H');
+    // All combinations
+    ['–','-'].forEach(d=>{
+      state.matchResults[`${hShort}${d}${aShort}`]=res;
+      state.matchResults[`${hS}${d}${aS}`]=res;
+      state.matchResults[`${hE}${d}${aE}`]=res;
+      // Bosnia-H. variant
+      const hBH=hS.replace(BH,'Bosnia-H.');
+      const aBH=aS.replace(BH,'Bosnia-H.');
+      state.matchResults[`${hBH}${d}${aBH}`]=res;
+    });
   }
   // Standings
   const sData=await fetchAPI('/competitions/WC/standings?season=2026');
@@ -379,7 +393,14 @@ function calcAllScores(){
     // Match tips
     for(const [mKey,tip] of Object.entries(p.matchTips)){
       const nKey=normalizeDash(mKey);
-      const res=state.matchResults[nKey]||state.matchResults[mKey];
+      // Try multiple key variants
+      // Try all key variants
+      const bh='Bosnien & Hercegovina';
+      const mk1=nKey;
+      const mk2=nKey.replace(/B&H/g,bh);
+      const mk3=nKey.replace(/Bosnia-H\./g,bh);
+      const mk4=mKey;
+      const res=state.matchResults[mk1]||state.matchResults[mk2]||state.matchResults[mk3]||state.matchResults[mk4]||null;
       if(!res||res.status!=='FINISHED'||res.scoreH===null) continue;
       let pts=0;
       const tipRes=parseTipScore(tip.res);
@@ -866,10 +887,23 @@ function renderTips(){
   document.getElementById('tips-content').innerHTML=rows;
 }
 
+function normalizeMatchKey(name) {
+  // Normalize all dash variants to em-dash for consistent lookup
+  return String(name).replace(/\s*[-–]\s*/g,'–').trim();
+}
+
 function parseExcelPlayers(raw){
   const headers=raw[2]||[];
   const matchColMap={};
-  for(let c=0;c<headers.length;c++){const h=String(headers[c]);if(h.includes('–')) matchColMap[h]=c;}
+  // Accept both regular dash and em-dash in match names
+  for(let c=0;c<headers.length;c++){
+    const h=String(headers[c]||'');
+    if((h.includes('–')||h.includes('-'))&&h.length>3&&!h.includes('(')&&!h.includes('VM')){
+      // Skip non-match columns
+      if(['VM-vinnare (5p)'].includes(h)) continue;
+      matchColMap[normalizeMatchKey(h)]=c;
+    }
+  }
   const players=[];
   for(let r=4;r<raw.length;r++){
     const row=raw[r];
