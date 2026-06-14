@@ -409,6 +409,30 @@ function calcAllScores(){
         }
       }
     }
+    // Målskytt poäng (1p per mål spelaren gjort)
+    for(const field of ['malskytt1','malskytt2']){
+      const tipped=(p[field]||'').trim();
+      if(!tipped) continue;
+      for(const s of state.scorers){
+        const pName=s.player?.name||'';
+        const goals=s.goals||s.numberOfGoals||0;
+        if(goals>0&&scorerMatch(tipped,pName)){
+          p.total+=goals;
+          p.breakdown[`scorer_${field}`]=(p.breakdown[`scorer_${field}`]||0)+goals;
+        }
+      }
+    }
+    // Skytteligavinnare (2p om tippad spelare leder skytteligansidan)
+    if(state.scorers.length){
+      const leader=state.scorers[0];
+      const leaderName=leader?.player?.name||'';
+      const leaderGoals=leader?.goals||0;
+      const tipped=(p.skytteliga||'').trim();
+      if(tipped&&leaderGoals>0&&scorerMatch(tipped,leaderName)){
+        p.total+=2;
+        p.breakdown['skytteliga_leader']=2;
+      }
+    }
     // Playoff round tips (1p per correct team)
     const rounds=['r32','r16','r8','r4','r2'];
     const actualAdvancers=getActualAdvancers();
@@ -465,6 +489,20 @@ function formatScore(val){
   return str.replace(/\s*–\s*/g,'–').replace(/\s*-\s*/g,'–')||'–';
 }
 function getSign(h,a){if(h===null||a===null) return null;if(h>a) return '1';if(h<a) return '2';return 'X';}
+function scorerMatch(tip,apiName){
+  if(!tip||!apiName) return false;
+  const t=tip.toLowerCase().trim();
+  const a=apiName.toLowerCase().trim();
+  if(t===a) return true;
+  // First name or last name match
+  const aParts=a.split(' ');
+  const tParts=t.split(' ');
+  // Check if tipped last name matches API last name
+  if(aParts.length>1&&tParts.length>0&&aParts[aParts.length-1]===tParts[tParts.length-1]) return true;
+  // Check if tip is contained in API name or vice versa
+  if(a.includes(t)||t.includes(aParts[aParts.length-1])) return true;
+  return false;
+}
 
 // ===== RENDER =====
 function renderMetrics(){
