@@ -492,22 +492,17 @@ function parseTipScore(s){
   if(!s) return null;
   const str=String(s).trim();
   if(/^\d{5,}$/.test(str)) return null;
-  const m=str.match(/(\d+)\s*[-–]\s*(\d+)/);
+  const m=str.match(/(\d+)\s*[-–:]\s*(\d+)/);
   if(!m) return null;
   return{h:parseInt(m[1]),a:parseInt(m[2])};
 }
 function normalizeDash(s){return String(s).replace(/\s*[-–]\s*/g,'–').trim();}
-function isExcelDate(val){
-  const str=String(val).trim();
-  if(str.includes('-')||str.includes('–')) return false;
-  const n=parseFloat(str);
-  return !isNaN(n)&&n>40000&&n<60000&&/^\d+(\.0)?$/.test(str);
-}
 function formatScore(val){
-  if(!val) return '–';
+  if(!val||val==='None') return '–';
   const str=String(val).trim();
-  if(isExcelDate(str)) return '–';
-  return str.replace(/\s*–\s*/g,'–').replace(/\s*-\s*/g,'–')||'–';
+  if(!str) return '–';
+  // Normalize dashes and colons
+  return str.replace(/\s*–\s*/g,'–').replace(/\s*--\s*/g,'–').replace(/\s*:\s*/g,'–')||'–';
 }
 function getSign(h,a){if(h===null||a===null) return null;if(h>a) return '1';if(h<a) return '2';return 'X';}
 function scorerMatch(tip,apiName){
