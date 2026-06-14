@@ -496,7 +496,7 @@ function parseTipScore(s){
   if(!s) return null;
   const str=String(s).trim();
   if(/^\d{5,}$/.test(str)) return null;
-  const m=str.match(/(\d+)\s*[-–:]\s*(\d+)/);
+  const m=str.match(/(\d+)\s*[-–:|]\s*(\d+)/);
   if(!m) return null;
   return{h:parseInt(m[1]),a:parseInt(m[2])};
 }
@@ -506,7 +506,7 @@ function formatScore(val){
   const str=String(val).trim();
   if(!str) return '–';
   // Normalize dashes and colons
-  return str.replace(/\s*–\s*/g,'–').replace(/\s*--\s*/g,'–').replace(/\s*:\s*/g,'–')||'–';
+  return str.replace(/\s*–\s*/g,'–').replace(/\s*--\s*/g,'–').replace(/\s*:\s*/g,'–').replace(/\s*\|\s*/g,'–')||'–';
 }
 function getSign(h,a){if(h===null||a===null) return null;if(h>a) return '1';if(h<a) return '2';return 'X';}
 function scorerMatch(tip,apiName){
@@ -886,6 +886,11 @@ function renderTips(){
   document.getElementById('tips-content').innerHTML=rows;
 }
 
+function cellToScore(val) {
+  if(val===null||val===undefined||val==='') return '';
+  return String(val).trim();
+}
+
 function normalizeMatchKey(name) {
   // Normalize all dash variants to em-dash for consistent lookup
   return String(name).replace(/\s*[-–]\s*/g,'–').trim();
@@ -919,7 +924,7 @@ function parseExcelPlayers(raw){
     };
     // Match tips
     for(const [mName,col] of Object.entries(matchColMap)){
-      const res=String(row[col]||'').trim();
+      const res=cellToScore(row[col]);
       const sign=String(row[col+1]||'').trim();
       if(res||sign) p.matchTips[mName]={res,sign};
     }
@@ -949,7 +954,7 @@ function handleFile(input){
     try{
       const wb=XLSX.read(e.target.result,{type:'array',cellDates:false,raw:true});
       const ws=wb.Sheets[wb.SheetNames[0]];
-      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
       const players=parseExcelPlayers(raw);
       state.players=players;
       if(state.apiOk) calcAllScores();
@@ -969,7 +974,7 @@ async function loadTipsFromGitHub(){
     const buf=await r.arrayBuffer();
     const wb=XLSX.read(buf,{type:'array',cellDates:false,raw:true});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+    const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
     const players=parseExcelPlayers(raw);
     state.players=players;
     document.getElementById('header-sub').textContent=`${players.filter(p=>p.vmvinnare||p.malskytt1).length} deltagare · VM 2026`;
