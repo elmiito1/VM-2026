@@ -447,17 +447,8 @@ function calcAllScores(){
         }
       }
     }
-    // Skytteligavinnare (2p om tippad spelare leder skytteligansidan)
-    if(state.scorers.length){
-      const leader=state.scorers[0];
-      const leaderName=leader?.player?.name||'';
-      const leaderGoals=leader?.goals||0;
-      const tipped=(p.skytteliga||'').trim();
-      if(tipped&&leaderGoals>0&&scorerMatch(tipped,leaderName)){
-        p.total+=2;
-        p.breakdown['skytteliga_leader']=2;
-      }
-    }
+    // Skytteligavinnare (2p) — räknas när turneringen är klar
+    // OBS: Inaktiverad under turneringen
     // Playoff round tips (1p per correct team)
     const rounds=['r32','r16','r8','r4','r2'];
     const actualAdvancers=getActualAdvancers();
@@ -842,6 +833,45 @@ function showDetail(name){
       <td style="color:var(--soft);font-size:11px">${actualScore}</td>
     </tr>`;
   }).join('');
+  // Build scorer stats for this player
+  const scorerGoals1 = (() => {
+    const tipped=(p.malskytt1||'').trim();
+    if(!tipped||!state.scorers.length) return null;
+    const s=state.scorers.find(s=>scorerMatch(tipped,s.player?.name||''));
+    return s?{name:s.player.name,goals:s.goals||0}:null;
+  })();
+  const scorerGoals2 = (() => {
+    const tipped=(p.malskytt2||'').trim();
+    if(!tipped||!state.scorers.length) return null;
+    const s=state.scorers.find(s=>scorerMatch(tipped,s.player?.name||''));
+    return s?{name:s.player.name,goals:s.goals||0}:null;
+  })();
+  const skytta = (() => {
+    const tipped=(p.skytteliga||'').trim();
+    if(!tipped||!state.scorers.length) return null;
+    const s=state.scorers.find(s=>scorerMatch(tipped,s.player?.name||''));
+    return s?{name:s.player.name,goals:s.goals||0,rank:state.scorers.indexOf(s)+1}:null;
+  })();
+
+  const scorerStatsHtml = (scorerGoals1||scorerGoals2||skytta) ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-top:1px solid var(--border)">
+      <div style="padding:10px 16px;border-right:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--soft);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Målskytt 1 · Mål hittills</div>
+        <div style="font-size:14px;font-weight:700;color:var(--green)">${scorerGoals1?scorerGoals1.goals+'⚽':'–'}</div>
+        <div style="font-size:11px;color:var(--soft)">${scorerGoals1?scorerGoals1.name:p.malskytt1||'–'}</div>
+      </div>
+      <div style="padding:10px 16px;border-right:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--soft);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Målskytt 2 · Mål hittills</div>
+        <div style="font-size:14px;font-weight:700;color:var(--green)">${scorerGoals2?scorerGoals2.goals+'⚽':'–'}</div>
+        <div style="font-size:11px;color:var(--soft)">${scorerGoals2?scorerGoals2.name:p.malskytt2||'–'}</div>
+      </div>
+      <div style="padding:10px 16px">
+        <div style="font-size:10px;color:var(--soft);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Skytteliga · Placering</div>
+        <div style="font-size:14px;font-weight:700;color:var(--green)">${skytta?'#'+skytta.rank+' ('+skytta.goals+'⚽)':'–'}</div>
+        <div style="font-size:11px;color:var(--soft)">${skytta?skytta.name:p.skytteliga||'–'}</div>
+      </div>
+    </div>` : '';
+
   document.getElementById('detail-content').innerHTML=`
     <div class="detail-card">
       <div class="detail-header">
@@ -849,6 +879,7 @@ function showDetail(name){
         <div><div class="detail-name">${escHtml(p.name)}</div><div class="detail-pts">${p.total} poäng totalt</div></div>
       </div>
       <div class="detail-grid">${indivRows}</div>
+      ${scorerStatsHtml}
     </div>
     ${matchRows?`
     <div class="section-label" style="margin-top:1rem">Mattips</div>
