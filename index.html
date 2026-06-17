@@ -421,15 +421,18 @@ function calcAllScores(){
       let pts=0;
       const tipRes=parseTipScore(tip.res);
       const tipSign=tip.sign?.trim().toUpperCase();
-      // If Excel has teams in opposite order vs API, flip the actual score/sign
-      const actualH=reversedOrder?res.scoreA:res.scoreH;
-      const actualA=reversedOrder?res.scoreH:res.scoreA;
+      // If Excel has teams in opposite order vs API, keep scores as-is
+      // (Excel treats first team as home, so 1=first team wins regardless of API order)
+      const actualH=res.scoreH;
+      const actualA=res.scoreA;
       const actualSign=getSign(actualH,actualA);
       // Derive sign from tipped result
       const tipResSign=tipRes?getSign(tipRes.h,tipRes.a):null;
       // Use explicit sign column first, fall back to sign from result
       const tippedSign=tipSign||tipResSign;
       // Correct result = 3p (independent of sign)
+      // When reversed, the tipped result is from Excel perspective (first team=home)
+      // API score is also first team=home in reversed case, so compare directly
       if(tipRes&&tipRes.h===actualH&&tipRes.a===actualA) pts+=3;
       // Correct sign = 1p (independent of result)
       if(tippedSign&&tippedSign===actualSign) pts+=1;
