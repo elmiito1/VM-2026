@@ -813,15 +813,38 @@ function showDetail(name){
   if(!p) return;
   const idx=[...state.players].sort((a,b)=>b.total-a.total).findIndex(x=>x.name===name);
   const color=COLORS[Math.max(0,idx)%COLORS.length];
-  const indivRows=[
-    ['Målskytt 1',p.malskytt1,'1p/mål'],['Målskytt 2',p.malskytt2,'1p/mål'],
-    ['Skytteligavinnare',p.skytteliga,'2p'],['Assistspelare',p.assist,'1p/assist'],
-    ['Vinnare assistligan',p.assistliga,'2p'],['VM-vinnare',p.vmvinnare,'5p'],
-  ].map(([label,val,pts])=>`
-    <div class="detail-item">
+  // Get goals for målskytt 1 and 2
+  const ms1Goals = (() => {
+    const t=(p.malskytt1||'').trim();
+    if(!t||!state.scorers.length) return null;
+    const s=state.scorers.find(s=>scorerMatch(t,s.player?.name||''));
+    return s?s.goals||0:null;
+  })();
+  const ms2Goals = (() => {
+    const t=(p.malskytt2||'').trim();
+    if(!t||!state.scorers.length) return null;
+    // Don't double-count same player as ms1
+    if(p.malskytt1&&p.malskytt2&&scorerMatch(p.malskytt1,p.malskytt2)) return null;
+    const s=state.scorers.find(s=>scorerMatch(t,s.player?.name||''));
+    return s?s.goals||0:null;
+  })();
+
+  function makeScorItem(label, pts, val, goals) {
+    const goalsHtml = goals !== null ? `<span style="color:var(--green);font-size:11px;margin-left:6px">${goals}⚽ = ${goals}p</span>` : '';
+    return `<div class="detail-item">
       <div class="detail-item-label">${label} <span style="font-weight:400;color:var(--soft)">(${pts})</span></div>
-      <div class="detail-item-val">${escHtml(val||'')||'<span style="color:var(--soft)">–</span>'}</div>
-    </div>`).join('');
+      <div class="detail-item-val">${escHtml(val||'')||'<span style="color:var(--soft)">–</span>'}${goalsHtml}</div>
+    </div>`;
+  }
+
+  const indivRows=[
+    makeScorItem('Målskytt 1','1p/mål',p.malskytt1,ms1Goals),
+    makeScorItem('Målskytt 2','1p/mål',p.malskytt2,ms2Goals),
+    `<div class="detail-item"><div class="detail-item-label">Skytteligavinnare <span style="font-weight:400;color:var(--soft)">(2p)</span></div><div class="detail-item-val">${escHtml(p.skytteliga||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
+    `<div class="detail-item"><div class="detail-item-label">Assistspelare <span style="font-weight:400;color:var(--soft)">(1p/assist)</span></div><div class="detail-item-val">${escHtml(p.assist||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
+    `<div class="detail-item"><div class="detail-item-label">Vinnare assistligan <span style="font-weight:400;color:var(--soft)">(2p)</span></div><div class="detail-item-val">${escHtml(p.assistliga||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
+    `<div class="detail-item"><div class="detail-item-label">VM-vinnare <span style="font-weight:400;color:var(--soft)">(5p)</span></div><div class="detail-item-val">${escHtml(p.vmvinnare||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
+  ].join('');
   const matchRows=Object.entries(p.matchTips).map(([match,tip])=>{
     const res=state.matchResults?.[match];
     const fin=res?.status==='FINISHED';
@@ -857,19 +880,7 @@ function showDetail(name){
     return s?{name:s.player.name,goals:s.goals||0,rank:state.scorers.indexOf(s)+1}:null;
   })();
 
-  const scorerStatsHtml = (scorerGoals1||scorerGoals2) ? `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--border)">
-      <div style="padding:10px 16px;border-right:1px solid var(--border)">
-        <div style="font-size:10px;color:var(--soft);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Målskytt 1 · Mål hittills</div>
-        <div style="font-size:14px;font-weight:700;color:var(--green)">${scorerGoals1?scorerGoals1.goals+'⚽':'–'}</div>
-        <div style="font-size:11px;color:var(--soft)">${scorerGoals1?scorerGoals1.name:p.malskytt1||'–'}</div>
-      </div>
-      <div style="padding:10px 16px">
-        <div style="font-size:10px;color:var(--soft);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Målskytt 2 · Mål hittills</div>
-        <div style="font-size:14px;font-weight:700;color:var(--green)">${scorerGoals2?scorerGoals2.goals+'⚽':'–'}</div>
-        <div style="font-size:11px;color:var(--soft)">${scorerGoals2?scorerGoals2.name:p.malskytt2||'–'}</div>
-      </div>
-    </div>` : '';
+  const scorerStatsHtml = '';
 
   document.getElementById('detail-content').innerHTML=`
     <div class="detail-card">
