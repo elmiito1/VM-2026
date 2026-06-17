@@ -435,13 +435,17 @@ function calcAllScores(){
       }
     }
     // Målskytt poäng (1p per mål spelaren gjort)
+    // Räkna bara unika spelare — om samma spelare är tippat på flera fält, räknas de bara en gång
+    const countedScorerIds = new Set();
     for(const field of ['malskytt1','malskytt2']){
       const tipped=(p[field]||'').trim();
       if(!tipped) continue;
       for(const s of state.scorers){
         const pName=s.player?.name||'';
+        const pid=s.player?.id||pName;
         const goals=s.goals||s.numberOfGoals||0;
-        if(goals>0&&scorerMatch(tipped,pName)){
+        if(goals>0&&scorerMatch(tipped,pName)&&!countedScorerIds.has(pid)){
+          countedScorerIds.add(pid);
           p.total+=goals;
           p.breakdown[`scorer_${field}`]=(p.breakdown[`scorer_${field}`]||0)+goals;
         }
@@ -853,22 +857,17 @@ function showDetail(name){
     return s?{name:s.player.name,goals:s.goals||0,rank:state.scorers.indexOf(s)+1}:null;
   })();
 
-  const scorerStatsHtml = (scorerGoals1||scorerGoals2||skytta) ? `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;border-top:1px solid var(--border)">
+  const scorerStatsHtml = (scorerGoals1||scorerGoals2) ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--border)">
       <div style="padding:10px 16px;border-right:1px solid var(--border)">
         <div style="font-size:10px;color:var(--soft);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Målskytt 1 · Mål hittills</div>
         <div style="font-size:14px;font-weight:700;color:var(--green)">${scorerGoals1?scorerGoals1.goals+'⚽':'–'}</div>
         <div style="font-size:11px;color:var(--soft)">${scorerGoals1?scorerGoals1.name:p.malskytt1||'–'}</div>
       </div>
-      <div style="padding:10px 16px;border-right:1px solid var(--border)">
+      <div style="padding:10px 16px">
         <div style="font-size:10px;color:var(--soft);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Målskytt 2 · Mål hittills</div>
         <div style="font-size:14px;font-weight:700;color:var(--green)">${scorerGoals2?scorerGoals2.goals+'⚽':'–'}</div>
         <div style="font-size:11px;color:var(--soft)">${scorerGoals2?scorerGoals2.name:p.malskytt2||'–'}</div>
-      </div>
-      <div style="padding:10px 16px">
-        <div style="font-size:10px;color:var(--soft);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Skytteliga · Placering</div>
-        <div style="font-size:14px;font-weight:700;color:var(--green)">${skytta?'#'+skytta.rank+' ('+skytta.goals+'⚽)':'–'}</div>
-        <div style="font-size:11px;color:var(--soft)">${skytta?skytta.name:p.skytteliga||'–'}</div>
       </div>
     </div>` : '';
 
