@@ -343,26 +343,23 @@ async function loadMatchData(){
     const res={homeSwe:hS,awaySwe:aS,homeEng:hE,awayEng:aE,
       scoreH:score?.home??null,scoreA:score?.away??null,
       status:m.status,stage:m.stage,group:m.group,id:m.id};
-    state.matchResults[`${hS}–${aS}`]=res;
-    state.matchResults[`${hE}–${aE}`]=res;
-    // Store many variants to maximize matching
-    const hFull=m.homeTeam?.name||'';
-    const aFull=m.awayTeam?.name||'';
-    if(hFull) state.matchResults[`${toSwe(hFull)}–${toSwe(aFull)}`]=res;
-    // Store shorthand variants (B&H etc) with both dash types
     const BH='Bosnien & Hercegovina';
     const hShort=hS.replace(BH,'B&H');
     const aShort=aS.replace(BH,'B&H');
-    // All combinations
-    ['–','-'].forEach(d=>{
-      state.matchResults[`${hShort}${d}${aShort}`]=res;
-      state.matchResults[`${hS}${d}${aS}`]=res;
-      state.matchResults[`${hE}${d}${aE}`]=res;
-      // Bosnia-H. variant
-      const hBH=hS.replace(BH,'Bosnia-H.');
-      const aBH=aS.replace(BH,'Bosnia-H.');
-      state.matchResults[`${hBH}${d}${aBH}`]=res;
-    });
+    const hFull=toSwe(m.homeTeam?.name||'');
+    const aFull=toSwe(m.awayTeam?.name||'');
+    // Store ALL combinations — both orders and all dash types
+    const homeVars=[hS,hE,hShort,hFull].filter(Boolean);
+    const awayVars=[aS,aE,aShort,aFull].filter(Boolean);
+    for(const h of [...new Set(homeVars)]){
+      for(const a of [...new Set(awayVars)]){
+        for(const d of ['–','-']){
+          state.matchResults[`${h}${d}${a}`]=res;
+          // Also reversed (Excel may have home/away swapped vs API)
+          state.matchResults[`${a}${d}${h}`]=res;
+        }
+      }
+    }
   }
   // Standings
   const sData=await fetchAPI('/competitions/WC/standings?season=2026');
@@ -393,25 +390,47 @@ function calcAllScores(){
     // Match tips
     for(const [mKey,tip] of Object.entries(p.matchTips)){
       const nKey=normalizeDash(mKey);
-      // Try multiple key variants
-      // Try all key variants
       const bh='Bosnien & Hercegovina';
       const mk1=nKey;
       const mk2=nKey.replace(/B&H/g,bh);
-      const mk3=nKey.replace(/Bosnia-H\./g,bh);
-      const mk4=mKey;
-      const res=state.matchResults[mk1]||state.matchResults[mk2]||state.matchResults[mk3]||state.matchResults[mk4]||null;
+      const mk3=mKey;
+      // Also try each team name individually to find the match
+      let res=state.matchResults[mk1]||state.matchResults[mk2]||state.matchResults[mk3]||null;
+      let reversedOrder=false;
+      if(!res){
+        // Fuzzy fallback: split match key into two teams, find match containing both
+        const parts=mKey.split(/[-–]/);
+        if(parts.length>=2){
+          const t1=parts[0].trim().toLowerCase();
+          const t2=parts.slice(1).join('–').trim().toLowerCase();
+          // First try normal order (t1=home, t2=away)
+          const normalMatch=Object.values(state.matchResults).find(r=>
+            r&&(teamMatch(t1,r.homeSwe)||teamMatch(t1,r.homeEng))&&
+               (teamMatch(t2,r.awaySwe)||teamMatch(t2,r.awayEng))
+          )||null;
+          // Then try reversed order (t1=away, t2=home in API)
+          const reversedMatch=Object.values(state.matchResults).find(r=>
+            r&&(teamMatch(t2,r.homeSwe)||teamMatch(t2,r.homeEng))&&
+               (teamMatch(t1,r.awaySwe)||teamMatch(t1,r.awayEng))
+          )||null;
+          if(normalMatch){res=normalMatch;}
+          else if(reversedMatch){res=reversedMatch;reversedOrder=true;}
+        }
+      }
       if(!res||res.status!=='FINISHED'||res.scoreH===null) continue;
       let pts=0;
       const tipRes=parseTipScore(tip.res);
       const tipSign=tip.sign?.trim().toUpperCase();
-      const actualSign=getSign(res.scoreH,res.scoreA);
+      // If Excel has teams in opposite order vs API, flip the actual score/sign
+      const actualH=reversedOrder?res.scoreA:res.scoreH;
+      const actualA=reversedOrder?res.scoreH:res.scoreA;
+      const actualSign=getSign(actualH,actualA);
       // Derive sign from tipped result
       const tipResSign=tipRes?getSign(tipRes.h,tipRes.a):null;
       // Use explicit sign column first, fall back to sign from result
       const tippedSign=tipSign||tipResSign;
       // Correct result = 3p (independent of sign)
-      if(tipRes&&tipRes.h===res.scoreH&&tipRes.a===res.scoreA) pts+=3;
+      if(tipRes&&tipRes.h===actualH&&tipRes.a===actualA) pts+=3;
       // Correct sign = 1p (independent of result)
       if(tippedSign&&tippedSign===actualSign) pts+=1;
       if(pts>0){p.total+=pts;p.breakdown[mKey]=pts;}
