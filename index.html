@@ -401,89 +401,151 @@ function renderGroups(){
 
 function renderPlayoff(){
   if(!state.matches.length){renderPlayoffStatic();return;}
-  const MW=140,MH=52,GAP=12,CONN=20;
+  const MH=52,GAP=20,MW=140,CONN=24;
+  const unit=MH+GAP;
 
-  function matchCard(m){
-    if(!m)return `<div class="bracket-match" style="opacity:.3"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>`;
-    const h=m.homeTeam?.shortName||m.homeTeam?.name||'TBD',a=m.awayTeam?.shortName||m.awayTeam?.name||'TBD';
+  // Find a match by team names (fuzzy both directions)
+  function fm(t1,t2){
+    return state.matches.find(m=>{
+      const h=m.homeTeam?.shortName||m.homeTeam?.name||'';
+      const a=m.awayTeam?.shortName||m.awayTeam?.name||'';
+      return (teamMatch(t1,h)&&teamMatch(t2,a))||(teamMatch(t2,h)&&teamMatch(t1,a));
+    })||null;
+  }
+
+  function winner(m){
+    if(!m||m.status!=='FINISHED')return null;
+    const sc=m.score?.fullTime;if(!sc)return null;
+    if(sc.home>sc.away)return m.homeTeam?.shortName||m.homeTeam?.name;
+    if(sc.away>sc.home)return m.awayTeam?.shortName||m.awayTeam?.name;
+    return null;
+  }
+
+  function card(m){
+    if(!m)return `<div class="bracket-match" style="opacity:.25"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>`;
+    const h=m.homeTeam?.shortName||m.homeTeam?.name||'TBD';
+    const a=m.awayTeam?.shortName||m.awayTeam?.name||'TBD';
     const sc=m.score?.fullTime,fin=m.status==='FINISHED',live=m.status==='IN_PLAY'||m.status==='PAUSED';
-    const hWin=fin&&sc?.home>sc?.away,aWin=fin&&sc?.away>sc?.home;
+    const hW=fin&&sc?.home>sc?.away,aW=fin&&sc?.away>sc?.home;
     const hS=fin?(sc?.home??''):live?'●':'',aS=fin?(sc?.away??''):live?'●':'';
     return `<div class="bracket-match">
-      <div class="bracket-team ${hWin?'winner':fin?'loser':h==='TBD'?'tbd':''}">${escHtml(toSwe(h))}${hS!==''?`<span class="bracket-score">${hS}</span>`:''}</div>
-      <div class="bracket-team ${aWin?'winner':fin?'loser':a==='TBD'?'tbd':''}">${escHtml(toSwe(a))}${aS!==''?`<span class="bracket-score">${aS}</span>`:''}</div>
+      <div class="bracket-team ${hW?'winner':fin?'loser':h==='TBD'?'tbd':''}">${escHtml(toSwe(h))}${hS!==''?`<span class="bracket-score">${hS}</span>`:''}</div>
+      <div class="bracket-team ${aW?'winner':fin?'loser':a==='TBD'?'tbd':''}">${escHtml(toSwe(a))}${aS!==''?`<span class="bracket-score">${aS}</span>`:''}</div>
     </div>`;
   }
 
-  const r32=state.matches.filter(m=>m.stage==='LAST_32'||m.stage==='ROUND_OF_32');
-  const r16=state.matches.filter(m=>m.stage==='LAST_16'||m.stage==='ROUND_OF_16');
-  const r8=state.matches.filter(m=>m.stage==='QUARTER_FINALS');
-  const r4=state.matches.filter(m=>m.stage==='SEMI_FINALS');
-  const final=state.matches.filter(m=>m.stage==='FINAL');
-  const r3=state.matches.filter(m=>m.stage==='THIRD_PLACE');
+  // STATIC bracket order from reference image
+  // Left side (top→bottom)
+  const L=[
+    fm('Germany','Paraguay'),
+    fm('France','Sweden'),
+    fm('South Africa','Canada'),
+    fm('Netherlands','Morocco'),
+    fm('Portugal','Croatia'),
+    fm('Spain','Austria'),
+    fm('USA','Bosnia'),
+    fm('Belgium','Senegal'),
+  ];
+  // Right side (top→bottom)
+  const R=[
+    fm('Brazil','Japan'),
+    fm('Ivory Coast','Norway'),
+    fm('Mexico','Ecuador'),
+    fm('England','Congo'),
+    fm('Australia','Egypt'),
+    fm('Argentina','Cape Verde'),
+    fm('Switzerland','Algeria'),
+    fm('Colombia','Ghana'),
+  ];
 
-  if(!r32.length){document.getElementById('playoff-content').innerHTML='<div class="empty" style="padding:3rem"><div class="empty-icon">🏆</div>Slutspelet börjar när gruppspelet är klart</div>';return;}
+  // Later rounds - find from API
+  const allR16=state.matches.filter(m=>m.stage==='LAST_16'||m.stage==='ROUND_OF_16');
+  const allR8=state.matches.filter(m=>m.stage==='QUARTER_FINALS');
+  const allR4=state.matches.filter(m=>m.stage==='SEMI_FINALS');
+  const allFin=state.matches.filter(m=>m.stage==='FINAL');
+  const allR3=state.matches.filter(m=>m.stage==='THIRD_PLACE');
 
-  const lR32=r32.slice(0,r32.length/2),rR32=r32.slice(r32.length/2);
-  const lR16=r16.slice(0,r16.length/2),rR16=r16.slice(r16.length/2);
-  const lR8=r8.slice(0,r8.length/2),rR8=r8.slice(r8.length/2);
-  const lR4=r4.slice(0,1),rR4=r4.slice(1);
+  const h16=Math.ceil(allR16.length/2);
+  const L8=allR16.slice(0,h16);
+  const R8=allR16.slice(h16);
+  const hQ=Math.ceil(allR8.length/2);
+  const LQ=allR8.slice(0,hQ);
+  const RQ=allR8.slice(hQ);
+  const LS=allR4[0]||null,RS=allR4[1]||null;
+  const FIN=allFin[0]||null,BRO=allR3[0]||null;
 
-  function buildCol(matches,label,level,isRight){
-    const unit=MH+GAP;
-    const mult=Math.pow(2,level);
-    const spacing=unit*mult;
-    const firstPad=(spacing-unit)/2;
-    const n=Math.max(matches.length,Math.pow(2,3-level));
-    const totalH=firstPad*2+(n-1)*spacing+MH;
-    const colW=MW+CONN;
-    let items='';
-    for(let i=0;i<n;i++){
-      const m=matches[i]||null;
-      const top=firstPad+i*spacing;
-      items+=`<div style="position:absolute;top:${top}px;left:${isRight?CONN:0}px">${matchCard(m)}</div>`;
-      if(i%2===0&&i+1<=n-1){
-        const yA=firstPad+i*spacing+MH/2;
-        const yB=firstPad+(i+1)*spacing+MH/2;
-        const lh=yB-yA;
-        const svgX=isRight?0:MW;
-        const mid=CONN/2;
-        const aX=isRight?CONN:0;
-        items+=`<svg style="position:absolute;top:${yA}px;left:${svgX}px;overflow:visible" width="${CONN}" height="${lh}" xmlns="http://www.w3.org/2000/svg">
-          <line x1="${aX}" y1="0" x2="${mid}" y2="0" stroke="#d1d5db" stroke-width="1.5"/>
-          <line x1="${mid}" y1="0" x2="${mid}" y2="${lh}" stroke="#d1d5db" stroke-width="1.5"/>
-          <line x1="${mid}" y1="${lh}" x2="${aX}" y2="${lh}" stroke="#d1d5db" stroke-width="1.5"/>
-        </svg>`;
-      }
-    }
-    return `<div style="flex-shrink:0;width:${colW}px">
-      <div style="font-size:10px;font-weight:800;color:var(--soft);text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">${label}</div>
-      <div style="position:relative;height:${totalH}px">${items}</div>
-    </div>`;
+  // Position helper: top px for match i at bracket level
+  function p(level,i){
+    const sp=unit*Math.pow(2,level);
+    const pad=(sp-MH)/2;
+    return pad+i*sp;
   }
 
-  const unit=MH+GAP;
-  const semiPad=(unit*8-unit)/2;
-  const bronzeHtml=r3.length?`<div style="margin-top:20px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Bronsmatch</div>${matchCard(r3[0])}</div>`:'';
-  const finalMatch=final.length?matchCard(final[0]):`<div class="bracket-match"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>`;
-  const finalHtml=`<div style="flex-shrink:0;width:175px;display:flex;flex-direction:column;align-items:center">
+  // Total column height (based on 8 matches at level 0)
+  const H=p(0,7)+MH+(MH+GAP)/2;
+  const W=MW+CONN;
+
+  function line(y1,y2,isRight){
+    const lh=y2-y1;
+    const mx=isRight?CONN*0.4:CONN*0.6;
+    const ex=isRight?CONN:0;
+    return `<svg style="position:absolute;top:${y1}px;left:${isRight?0:MW}px;overflow:visible" width="${CONN}" height="${lh}" xmlns="http://www.w3.org/2000/svg">
+      <line x1="${ex}" y1="0" x2="${mx}" y2="0" stroke="#cbd5e1" stroke-width="1.5"/>
+      <line x1="${mx}" y1="0" x2="${mx}" y2="${lh}" stroke="#cbd5e1" stroke-width="1.5"/>
+      <line x1="${mx}" y1="${lh}" x2="${ex}" y2="${lh}" stroke="#cbd5e1" stroke-width="1.5"/>
+    </svg>`;
+  }
+
+  function colLabel(label){return `<div style="font-size:10px;font-weight:800;color:var(--soft);text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">${label}</div>`;}
+
+  function buildLeft(){
+    let out='';
+    // 16-del
+    let inner='';
+    for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:0">${card(L[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,false);}
+    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
+    // 8-del
+    inner='';
+    for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:0">${card(L8[i]||null)}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,false);}
+    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
+    // Kvart
+    inner='';
+    for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:0">${card(LQ[i]||null)}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,false);}
+    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
+    // Semi
+    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:0">${card(LS)}</div></div></div>`;
+    return out;
+  }
+
+  function buildRight(){
+    let out='';
+    // Semi
+    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:${CONN}px">${card(RS)}</div></div></div>`;
+    // Kvart
+    let inner='';
+    for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:${CONN}px">${card(RQ[i]||null)}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,true);}
+    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
+    // 8-del
+    inner='';
+    for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:${CONN}px">${card(R8[i]||null)}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,true);}
+    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
+    // 16-del
+    inner='';
+    for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:${CONN}px">${card(R[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,true);}
+    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
+    return out;
+  }
+
+  const bronze=BRO?`<div style="margin-top:20px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Bronsmatch</div>${card(BRO)}</div>`:'';
+  const finCard=FIN?card(FIN):`<div class="bracket-match"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>`;
+  const finCol=`<div style="flex-shrink:0;width:180px;display:flex;flex-direction:column;align-items:center">
     <div style="font-size:10px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">⚽ FINAL</div>
-    <div style="margin-top:${semiPad}px;display:flex;flex-direction:column;align-items:center;gap:10px">
-      ${finalMatch}<div style="font-size:32px;line-height:1">🏆</div>${bronzeHtml}
+    <div style="margin-top:${p(3,0)}px;display:flex;flex-direction:column;align-items:center;gap:12px">
+      ${finCard}<div style="font-size:32px;line-height:1">🏆</div>${bronze}
     </div>
   </div>`;
 
-  document.getElementById('playoff-content').innerHTML=`<div class="bracket-wrapper">
-    ${lR32.length?buildCol(lR32,'16-DEL',0,false):''}
-    ${lR16.length?buildCol(lR16,'8-DEL',1,false):''}
-    ${lR8.length?buildCol(lR8,'KVART',2,false):''}
-    ${lR4.length?buildCol(lR4,'SEMI',3,false):''}
-    ${finalHtml}
-    ${rR4.length?buildCol(rR4,'SEMI',3,true):''}
-    ${rR8.length?buildCol(rR8,'KVART',2,true):''}
-    ${rR16.length?buildCol(rR16,'8-DEL',1,true):''}
-    ${rR32.length?buildCol(rR32,'16-DEL',0,true):''}
-  </div>`;
+  document.getElementById('playoff-content').innerHTML=`<div class="bracket-wrapper">${buildLeft()}${finCol}${buildRight()}</div>`;
 }
 function renderPlayoffStatic(){document.getElementById('playoff-content').innerHTML='<div class="empty" style="padding:3rem"><div class="empty-icon">🏆</div>Slutspelet börjar när gruppspelet är klart</div>';}
 
