@@ -1005,6 +1005,43 @@ function showDetail(name){
     </div>`;
   }).join('');
 
+  const advancers=getActualAdvancers();
+  const roundNames=['16-delsfinal','Åttondelsfinaler','Kvartsfinaler','Semifinaler','Final'];
+  const playoffRows=PLAYOFF_ROUND_COLS.map((round,ri)=>{
+    const tips=p.playoffTips?.[ri]||[];
+    if(!tips.length) return '';
+    const actual=advancers[ri]||[];
+    const isDone=actual.length>0;
+    const totalPts=tips.reduce((s,tip)=>s+(p.breakdown?.[`playoff_r${ri}_${tip}`]||0),0);
+    const rows=tips.map(tip=>{
+      const correct=actual.some(a=>teamMatch(tip,a));
+      const pts=p.breakdown?.[`playoff_r${ri}_${tip}`]||0;
+      return `<tr style="font-size:11px">
+        <td style="padding:5px 12px;color:${correct?'var(--green)':'var(--text)'};font-weight:${correct?'700':'400'}">${tip}</td>
+        <td style="padding:5px 12px;text-align:center">${isDone?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${correct?'var(--green-mid)':'#fee2e2'};color:${correct?'#065f46':'#991b1b'}">${correct?'+1p':'0p'}</span>`:'<span style="color:var(--soft)">–</span>'}</td>
+      </tr>`;
+    }).join('');
+    return `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:6px">
+      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);cursor:pointer;font-size:12px;font-weight:600">
+        <span>${roundNames[ri]}</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          ${totalPts>0?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--green-mid);color:#065f46">+${totalPts}p</span>`:''}
+          ${!isDone?'<span style="font-size:10px;color:var(--soft)">Ej spelat</span>':''}
+          <span style="color:var(--soft)">▾</span>
+        </span>
+      </div>
+      <div style="display:none">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:var(--bg);font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase">
+            <th style="padding:5px 12px;text-align:left">Lag</th>
+            <th style="padding:5px 12px;text-align:center">Poäng</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).filter(Boolean).join('');
+
   const matchRows=Object.entries(p.matchTips).map(([match,tip])=>{
     const res=state.matchResults?.[match];
     const fin=res?.status==='FINISHED';
@@ -1054,6 +1091,9 @@ function showDetail(name){
     ${groupRows?`
     <div class="section-label" style="margin-top:1rem">Grupplaceringar</div>
     <div style="margin-bottom:1rem">${groupRows}</div>`:''}
+    ${playoffRows?`
+    <div class="section-label" style="margin-top:1rem">Slutspelstips</div>
+    <div style="margin-bottom:1rem">${playoffRows}</div>`:''}
     ${matchRows?`
     <div class="section-label" style="margin-top:1rem">Mattips</div>
     <div class="lb" style="overflow-x:auto">
@@ -1197,3 +1237,5 @@ init();
 </script>
 </body>
 </html>
+
+
