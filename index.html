@@ -267,18 +267,22 @@ async function loadMatchData(){
 function getActualAdvancers(){
   const rounds=[[],[],[],[],[]];
   if(!state.matches.length)return rounds;
-  const r32=state.matches.filter(m=>m.stage==='LAST_32');
-  for(const m of r32){
+  // rounds[0] = alla lag i LAST_32 → 1p för 16-delsfinal
+  // rounds[1] = vinnare av LAST_32 → 1p för åttondelsfinaler
+  // rounds[2] = vinnare av LAST_16 → 1p för kvartsfinaler
+  // rounds[3] = vinnare av QUARTER_FINALS → 1p för semifinaler
+  // rounds[4] = vinnare av SEMI_FINALS → 1p för finalen
+  for(const m of state.matches.filter(m=>m.stage==='LAST_32')){
     const h=m.homeTeam?.shortName||m.homeTeam?.name,a=m.awayTeam?.shortName||m.awayTeam?.name;
     if(h&&!rounds[0].includes(h))rounds[0].push(h);
     if(a&&!rounds[0].includes(a))rounds[0].push(a);
   }
-  const stages=['LAST_16','QUARTER_FINALS','SEMI_FINALS','FINAL'];
+  const stages=['LAST_32','LAST_16','QUARTER_FINALS','SEMI_FINALS'];
   for(let i=0;i<stages.length;i++){
     for(const m of state.matches.filter(m=>m.stage===stages[i]&&m.status==='FINISHED')){
       const sc=m.score?.fullTime;if(!sc)continue;
       const w=sc.home>sc.away?(m.homeTeam?.shortName||m.homeTeam?.name):sc.away>sc.home?(m.awayTeam?.shortName||m.awayTeam?.name):null;
-      if(w)rounds[i+1].push(w);
+      if(w&&!rounds[i+1].includes(w))rounds[i+1].push(w);
     }
   }
   return rounds;
@@ -594,9 +598,11 @@ function showDetail(name){
     const isDone=actual.length>0||totalPts>0;
     const rows=tips.map(tip=>{
       const pts=p.breakdown?.[`playoff_r${ri}_${tip}`]||0;
+      const inActual=actual.some(a=>teamMatch(tip,a));
+      const showResult=pts>0||isDone;
       return `<tr style="font-size:11px">
         <td style="padding:5px 12px;color:${pts>0?'var(--green)':'var(--text)'};font-weight:${pts>0?'700':'400'}">${tip}</td>
-        <td style="padding:5px 12px;text-align:center">${pts>0||isDone?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${pts>0?'var(--green-mid)':'#fee2e2'};color:${pts>0?'#065f46':'#991b1b'}">${pts>0?'+'+pts+'p':'0p'}</span>`:'<span style="color:var(--soft)">–</span>'}</td>
+        <td style="padding:5px 12px;text-align:center">${showResult?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${pts>0?'var(--green-mid)':'#fee2e2'};color:${pts>0?'#065f46':'#991b1b'}">${pts>0?'+'+pts+'p':'0p'}</span>`:'<span style="color:var(--soft)">–</span>'}</td>
       </tr>`;
     }).join('');
     return `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:6px">
@@ -651,7 +657,6 @@ async function loadTipsFromGitHub(){
   try{const r=await fetch('tips.xlsx');if(!r.ok)return;const wb=XLSX.read(await r.arrayBuffer(),{type:'array',cellDates:false,raw:true});const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:true});state.players=parseExcelPlayers(raw);document.getElementById('header-sub').textContent=`${state.players.filter(p=>p.vmvinnare||p.malskytt1).length} deltagare · VM 2026`;renderLeaderboard();renderMetrics();renderTips();console.log('Tips laddade:',state.players.length);}catch(e){console.log('Ingen tips.xlsx:',e);}
 }
 async function init(){
-  // Tips först, sedan matchdata, sedan beräkna poäng
   await loadTipsFromGitHub();
   await loadMatchData();
   if(state.players.length&&state.apiOk){
