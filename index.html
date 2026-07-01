@@ -268,10 +268,13 @@ async function loadMatchData(){
 function getActualAdvancers(){
   const rounds=[[],[],[],[],[]];
   if(!state.matches.length)return rounds;
-  const r32=state.matches.filter(m=>m.stage==='LAST_32'||m.stage==='ROUND_OF_32');
-  if(r32.length){for(const m of r32){const h=m.homeTeam?.shortName||m.homeTeam?.name,a=m.awayTeam?.shortName||m.awayTeam?.name;if(h&&!rounds[0].includes(h))rounds[0].push(h);if(a&&!rounds[0].includes(a))rounds[0].push(a);}}
-  else{for(const[g,table]of Object.entries(state.standings)){for(let i=0;i<Math.min(2,table.length);i++){const n=table[i]?.team?.shortName||table[i]?.team?.name;if(n)rounds[0].push(n);}}}
-  const stages=['ROUND_OF_16','QUARTER_FINALS','SEMI_FINALS','FINAL'];
+  const r32=state.matches.filter(m=>m.stage==='LAST_32');
+  for(const m of r32){
+    const h=m.homeTeam?.shortName||m.homeTeam?.name,a=m.awayTeam?.shortName||m.awayTeam?.name;
+    if(h&&!rounds[0].includes(h))rounds[0].push(h);
+    if(a&&!rounds[0].includes(a))rounds[0].push(a);
+  }
+  const stages=['LAST_16','QUARTER_FINALS','SEMI_FINALS','FINAL'];
   for(let i=0;i<stages.length;i++){
     for(const m of state.matches.filter(m=>m.stage===stages[i]&&m.status==='FINISHED')){
       const sc=m.score?.fullTime;if(!sc)continue;
@@ -404,23 +407,6 @@ function renderPlayoff(){
   const MH=52,GAP=20,MW=140,CONN=24;
   const unit=MH+GAP;
 
-  // Find a match by team names (fuzzy both directions)
-  function fm(t1,t2){
-    return state.matches.find(m=>{
-      const h=m.homeTeam?.shortName||m.homeTeam?.name||'';
-      const a=m.awayTeam?.shortName||m.awayTeam?.name||'';
-      return (teamMatch(t1,h)&&teamMatch(t2,a))||(teamMatch(t2,h)&&teamMatch(t1,a));
-    })||null;
-  }
-
-  function winner(m){
-    if(!m||m.status!=='FINISHED')return null;
-    const sc=m.score?.fullTime;if(!sc)return null;
-    if(sc.home>sc.away)return m.homeTeam?.shortName||m.homeTeam?.name;
-    if(sc.away>sc.home)return m.awayTeam?.shortName||m.awayTeam?.name;
-    return null;
-  }
-
   function card(m){
     if(!m)return `<div class="bracket-match" style="opacity:.25"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>`;
     const h=m.homeTeam?.shortName||m.homeTeam?.name||'TBD';
@@ -434,105 +420,108 @@ function renderPlayoff(){
     </div>`;
   }
 
-  // STATIC bracket order from reference image
-  // Left side (top→bottom)
-  const L=[
-    fm('Germany','Paraguay'),
-    fm('France','Sweden'),
-    fm('South Africa','Canada'),
-    fm('Netherlands','Morocco'),
-    fm('Portugal','Croatia'),
-    fm('Spain','Austria'),
-    fm('USA','Bosnia'),
-    fm('Belgium','Senegal'),
-  ];
-  // Right side (top→bottom)
-  const R=[
-    fm('Brazil','Japan'),
-    fm('Ivory Coast','Norway'),
-    fm('Mexico','Ecuador'),
-    fm('England','Congo'),
-    fm('Australia','Egypt'),
-    fm('Argentina','Cape Verde'),
-    fm('Switzerland','Algeria'),
-    fm('Colombia','Ghana'),
-  ];
-
-  // Later rounds - find from API
-  const allR16=state.matches.filter(m=>m.stage==='LAST_16'||m.stage==='ROUND_OF_16');
-  const allR8=state.matches.filter(m=>m.stage==='QUARTER_FINALS');
-  const allR4=state.matches.filter(m=>m.stage==='SEMI_FINALS');
-  const allFin=state.matches.filter(m=>m.stage==='FINAL');
-  const allR3=state.matches.filter(m=>m.stage==='THIRD_PLACE');
-
-  const h16=Math.ceil(allR16.length/2);
-  const L8=allR16.slice(0,h16);
-  const R8=allR16.slice(h16);
-  const hQ=Math.ceil(allR8.length/2);
-  const LQ=allR8.slice(0,hQ);
-  const RQ=allR8.slice(hQ);
-  const LS=allR4[0]||null,RS=allR4[1]||null;
-  const FIN=allFin[0]||null,BRO=allR3[0]||null;
-
-  // Position helper: top px for match i at bracket level
-  function p(level,i){
-    const sp=unit*Math.pow(2,level);
-    const pad=(sp-MH)/2;
-    return pad+i*sp;
+  function fm(t1,t2){
+    return state.matches.find(m=>{
+      const h=m.homeTeam?.shortName||m.homeTeam?.name||'';
+      const a=m.awayTeam?.shortName||m.awayTeam?.name||'';
+      return (teamMatch(t1,h)&&teamMatch(t2,a))||(teamMatch(t2,h)&&teamMatch(t1,a));
+    })||null;
   }
 
-  // Total column height (based on 8 matches at level 0)
+  function winnerOf(m){
+    if(!m||m.status!=='FINISHED')return null;
+    const sc=m.score?.fullTime;if(!sc)return null;
+    if(sc.home>sc.away)return m.homeTeam?.shortName||m.homeTeam?.name;
+    if(sc.away>sc.home)return m.awayTeam?.shortName||m.awayTeam?.name;
+    return null;
+  }
+
+  function findKO(stage,w1,w2){
+    const ms=state.matches.filter(m=>m.stage===stage);
+    if(w1&&w2){
+      const m=ms.find(m=>{
+        const h=m.homeTeam?.shortName||m.homeTeam?.name||'';
+        const a=m.awayTeam?.shortName||m.awayTeam?.name||'';
+        return (teamMatch(w1,h)&&teamMatch(w2,a))||(teamMatch(w2,h)&&teamMatch(w1,a));
+      });
+      if(m)return m;
+    }
+    // Fallback: return unmatched match in stage
+    return ms.find(m=>!m.homeTeam?.name||!winnerOf({status:'FINISHED',score:{fullTime:{home:1,away:0}}}))||ms[0]||null;
+  }
+
+  // EXACT bracket order from reference image:
+  // Left (top→bottom): GER-PAR, FRA-SWE, RSA-CAN, NED-MAR, POR-CRO, ESP-AUT, USA-BIH, BEL-SEN
+  // Right (top→bottom): BRA-JPN, CIV-NOR, MEX-ECU, ENG-COD, ARG-CPV, AUS-EGY, SUI-ALG, COL-GHA
+  const L=[
+    fm('Germany','Paraguay'),fm('France','Sweden'),
+    fm('South Africa','Canada'),fm('Netherlands','Morocco'),
+    fm('Portugal','Croatia'),fm('Spain','Austria'),
+    fm('USA','Bosnia'),fm('Belgium','Senegal'),
+  ];
+  const R=[
+    fm('Brazil','Japan'),fm('Ivory Coast','Norway'),
+    fm('Mexico','Ecuador'),fm('England','Congo'),
+    fm('Argentina','Cape Verde'),fm('Australia','Egypt'),
+    fm('Switzerland','Algeria'),fm('Colombia','Ghana'),
+  ];
+
+  // Find 8-del/kvart/semi by tracking actual winners
+  function getL8(i){return findKO('LAST_16',winnerOf(L[i*2]),winnerOf(L[i*2+1]));}
+  function getR8(i){return findKO('LAST_16',winnerOf(R[i*2]),winnerOf(R[i*2+1]));}
+  const L8=[getL8(0),getL8(1),getL8(2),getL8(3)];
+  const R8=[getR8(0),getR8(1),getR8(2),getR8(3)];
+
+  function getLQ(i){return findKO('QUARTER_FINALS',winnerOf(L8[i*2]),winnerOf(L8[i*2+1]));}
+  function getRQ(i){return findKO('QUARTER_FINALS',winnerOf(R8[i*2]),winnerOf(R8[i*2+1]));}
+  const LQ=[getLQ(0),getLQ(1)];
+  const RQ=[getRQ(0),getRQ(1)];
+
+  const LS=findKO('SEMI_FINALS',winnerOf(LQ[0]),winnerOf(LQ[1]));
+  const RS=findKO('SEMI_FINALS',winnerOf(RQ[0]),winnerOf(RQ[1]));
+  const FIN=state.matches.find(m=>m.stage==='FINAL')||null;
+  const BRO=state.matches.find(m=>m.stage==='THIRD_PLACE')||null;
+
+  function p(level,i){const sp=unit*Math.pow(2,level);return (sp-MH)/2+i*sp;}
   const H=p(0,7)+MH+(MH+GAP)/2;
   const W=MW+CONN;
 
   function line(y1,y2,isRight){
-    const lh=y2-y1;
-    const mx=isRight?CONN*0.4:CONN*0.6;
-    const ex=isRight?CONN:0;
+    const lh=y2-y1,mx=isRight?CONN*0.4:CONN*0.6,ex=isRight?CONN:0;
     return `<svg style="position:absolute;top:${y1}px;left:${isRight?0:MW}px;overflow:visible" width="${CONN}" height="${lh}" xmlns="http://www.w3.org/2000/svg">
       <line x1="${ex}" y1="0" x2="${mx}" y2="0" stroke="#cbd5e1" stroke-width="1.5"/>
       <line x1="${mx}" y1="0" x2="${mx}" y2="${lh}" stroke="#cbd5e1" stroke-width="1.5"/>
       <line x1="${mx}" y1="${lh}" x2="${ex}" y2="${lh}" stroke="#cbd5e1" stroke-width="1.5"/>
     </svg>`;
   }
-
-  function colLabel(label){return `<div style="font-size:10px;font-weight:800;color:var(--soft);text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">${label}</div>`;}
+  function lbl(t){return `<div style="font-size:10px;font-weight:800;color:var(--soft);text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">${t}</div>`;}
 
   function buildLeft(){
-    let out='';
-    // 16-del
-    let inner='';
+    let out='',inner='';
     for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:0">${card(L[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,false);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    // 8-del
+    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
     inner='';
-    for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:0">${card(L8[i]||null)}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,false);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    // Kvart
+    for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:0">${card(L8[i])}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,false);}
+    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
     inner='';
-    for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:0">${card(LQ[i]||null)}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,false);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    // Semi
-    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:0">${card(LS)}</div></div></div>`;
+    for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:0">${card(LQ[i])}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,false);}
+    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
+    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:0">${card(LS)}</div></div></div>`;
     return out;
   }
 
   function buildRight(){
-    let out='';
-    // Semi
-    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:${CONN}px">${card(RS)}</div></div></div>`;
-    // Kvart
-    let inner='';
-    for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:${CONN}px">${card(RQ[i]||null)}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,true);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    // 8-del
+    let out='',inner='';
+    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:${CONN}px">${card(RS)}</div></div></div>`;
     inner='';
-    for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:${CONN}px">${card(R8[i]||null)}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,true);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    // 16-del
+    for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:${CONN}px">${card(RQ[i])}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,true);}
+    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
+    inner='';
+    for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:${CONN}px">${card(R8[i])}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,true);}
+    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
     inner='';
     for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:${CONN}px">${card(R[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,true);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${colLabel('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
+    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
     return out;
   }
 
