@@ -437,8 +437,18 @@ function renderPlayoff(){
       return (teamMatch(w1,h)&&teamMatch(w2,a))||(teamMatch(w2,h)&&teamMatch(w1,a));
     })||null;
   }
-  const L=[fm('Germany','Paraguay'),fm('France','Sweden'),fm('South Africa','Canada'),fm('Netherlands','Morocco'),fm('Portugal','Croatia'),fm('Spain','Austria'),fm('USA','Bosnia'),fm('Belgium','Senegal')];
-  const R=[fm('Brazil','Japan'),fm('Ivory Coast','Norway'),fm('Mexico','Ecuador'),fm('England','Congo'),fm('Argentina','Cape Verde'),fm('Australia','Egypt'),fm('Switzerland','Algeria'),fm('Colombia','Ghana')];
+  const L=[
+    fm('Germany','Paraguay'),fm('France','Sweden'),
+    fm('South Africa','Canada'),fm('Netherlands','Morocco'),
+    fm('Portugal','Croatia'),fm('Spain','Austria'),
+    fm('USA','Bosnia-H.'),fm('Belgium','Senegal'),
+  ];
+  const R=[
+    fm('Brazil','Japan'),fm('Ivory Coast','Norway'),
+    fm('Mexico','Ecuador'),fm('England','Congo DR'),
+    fm('Argentina','Cape Verde'),fm('Australia','Egypt'),
+    fm('Switzerland','Algeria'),fm('Colombia','Ghana'),
+  ];
   function getL8(i){return findKO('LAST_16',winnerOf(L[i*2]),winnerOf(L[i*2+1]));}
   function getR8(i){return findKO('LAST_16',winnerOf(R[i*2]),winnerOf(R[i*2+1]));}
   const L8=[getL8(0),getL8(1),getL8(2),getL8(3)];
@@ -580,11 +590,15 @@ function showDetail(name){
   const roundNames=['16-delsfinal','Åttondelsfinaler','Kvartsfinaler','Semifinaler','Final'];
   const playoffRows=PLAYOFF_ROUND_COLS.map((round,ri)=>{
     const tips=p.playoffTips?.[ri]||[];if(!tips.length)return '';
-    const actual=advancers[ri]||[],isDone=actual.length>0;
+    const actual=advancers[ri]||[];
     const totalPts=tips.reduce((s,tip)=>s+(p.breakdown?.[`playoff_r${ri}_${tip}`]||0),0);
+    const isDone=actual.length>0||totalPts>0;
     const rows=tips.map(tip=>{
-      const correct=actual.some(a=>teamMatch(tip,a));
-      return `<tr style="font-size:11px"><td style="padding:5px 12px;color:${correct?'var(--green)':'var(--text)'};font-weight:${correct?'700':'400'}">${tip}</td><td style="padding:5px 12px;text-align:center">${isDone?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${correct?'var(--green-mid)':'#fee2e2'};color:${correct?'#065f46':'#991b1b'}">${correct?'+1p':'0p'}</span>`:'<span style="color:var(--soft)">–</span>'}</td></tr>`;
+      const pts=p.breakdown?.[`playoff_r${ri}_${tip}`]||0;
+      return `<tr style="font-size:11px">
+        <td style="padding:5px 12px;color:${pts>0?'var(--green)':'var(--text)'};font-weight:${pts>0?'700':'400'}">${tip}</td>
+        <td style="padding:5px 12px;text-align:center">${pts>0||isDone?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${pts>0?'var(--green-mid)':'#fee2e2'};color:${pts>0?'#065f46':'#991b1b'}">${pts>0?'+'+pts+'p':'0p'}</span>`:'<span style="color:var(--soft)">–</span>'}</td>
+      </tr>`;
     }).join('');
     return `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:6px">
       <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);cursor:pointer;font-size:12px;font-weight:600">
