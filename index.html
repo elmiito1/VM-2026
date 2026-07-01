@@ -259,8 +259,7 @@ async function loadMatchData(){
   if(scData?.scorers)state.scorers=scData.scorers;
   state.lastFetch=new Date();
   document.getElementById('last-update').textContent=`Uppdaterat ${state.lastFetch.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'})}`;
-  if(state.players.length)calcAllScores();
-  renderGroups();renderPlayoff();renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();
+  renderGroups();renderPlayoff();
   const played=data.matches.filter(m=>m.status==='FINISHED').length;
   document.getElementById('m-played').textContent=played;
   document.getElementById('m-played-sub').textContent=`av ${data.matches.length} spelade`;
@@ -652,10 +651,20 @@ async function loadTipsFromGitHub(){
   try{const r=await fetch('tips.xlsx');if(!r.ok)return;const wb=XLSX.read(await r.arrayBuffer(),{type:'array',cellDates:false,raw:true});const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:true});state.players=parseExcelPlayers(raw);document.getElementById('header-sub').textContent=`${state.players.filter(p=>p.vmvinnare||p.malskytt1).length} deltagare · VM 2026`;renderLeaderboard();renderMetrics();renderTips();console.log('Tips laddade:',state.players.length);}catch(e){console.log('Ingen tips.xlsx:',e);}
 }
 async function init(){
-  await Promise.all([loadTipsFromGitHub(),loadMatchData()]);
-  if(state.players.length&&state.apiOk)calcAllScores();
-  renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();
-  setInterval(async()=>{await loadMatchData();},REFRESH_MS);
+  // Tips först, sedan matchdata, sedan beräkna poäng
+  await loadTipsFromGitHub();
+  await loadMatchData();
+  if(state.players.length&&state.apiOk){
+    calcAllScores();
+    renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();
+  }
+  setInterval(async()=>{
+    await loadMatchData();
+    if(state.players.length&&state.apiOk){
+      calcAllScores();
+      renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();
+    }
+  },REFRESH_MS);
 }
 init();
 </script>
