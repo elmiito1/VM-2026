@@ -401,16 +401,13 @@ function renderGroups(){
       <div class="group-teams">${g.teams.map(t=>`<div class="team-chip">${t}</div>`).join('')}</div><div>${matchRows}</div>${standingsHtml}</div>`;
   }).join('');
 }
-
 function renderPlayoff(){
   if(!state.matches.length){renderPlayoffStatic();return;}
   const MH=52,GAP=20,MW=140,CONN=24;
   const unit=MH+GAP;
-
   function card(m){
     if(!m)return `<div class="bracket-match" style="opacity:.25"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>`;
-    const h=m.homeTeam?.shortName||m.homeTeam?.name||'TBD';
-    const a=m.awayTeam?.shortName||m.awayTeam?.name||'TBD';
+    const h=m.homeTeam?.shortName||m.homeTeam?.name||'TBD',a=m.awayTeam?.shortName||m.awayTeam?.name||'TBD';
     const sc=m.score?.fullTime,fin=m.status==='FINISHED',live=m.status==='IN_PLAY'||m.status==='PAUSED';
     const hW=fin&&sc?.home>sc?.away,aW=fin&&sc?.away>sc?.home;
     const hS=fin?(sc?.home??''):live?'●':'',aS=fin?(sc?.away??''):live?'●':'';
@@ -419,15 +416,12 @@ function renderPlayoff(){
       <div class="bracket-team ${aW?'winner':fin?'loser':a==='TBD'?'tbd':''}">${escHtml(toSwe(a))}${aS!==''?`<span class="bracket-score">${aS}</span>`:''}</div>
     </div>`;
   }
-
   function fm(t1,t2){
     return state.matches.find(m=>{
-      const h=m.homeTeam?.shortName||m.homeTeam?.name||'';
-      const a=m.awayTeam?.shortName||m.awayTeam?.name||'';
+      const h=m.homeTeam?.shortName||m.homeTeam?.name||'',a=m.awayTeam?.shortName||m.awayTeam?.name||'';
       return (teamMatch(t1,h)&&teamMatch(t2,a))||(teamMatch(t2,h)&&teamMatch(t1,a));
     })||null;
   }
-
   function winnerOf(m){
     if(!m||m.status!=='FINISHED')return null;
     const sc=m.score?.fullTime;if(!sc)return null;
@@ -435,57 +429,29 @@ function renderPlayoff(){
     if(sc.away>sc.home)return m.awayTeam?.shortName||m.awayTeam?.name;
     return null;
   }
-
   function findKO(stage,w1,w2){
+    if(!w1||!w2)return null;
     const ms=state.matches.filter(m=>m.stage===stage);
-    if(w1&&w2){
-      const m=ms.find(m=>{
-        const h=m.homeTeam?.shortName||m.homeTeam?.name||'';
-        const a=m.awayTeam?.shortName||m.awayTeam?.name||'';
-        return (teamMatch(w1,h)&&teamMatch(w2,a))||(teamMatch(w2,h)&&teamMatch(w1,a));
-      });
-      if(m)return m;
-    }
-    // Fallback: return unmatched match in stage
-    return ms.find(m=>!m.homeTeam?.name||!winnerOf({status:'FINISHED',score:{fullTime:{home:1,away:0}}}))||ms[0]||null;
+    return ms.find(m=>{
+      const h=m.homeTeam?.shortName||m.homeTeam?.name||'',a=m.awayTeam?.shortName||m.awayTeam?.name||'';
+      return (teamMatch(w1,h)&&teamMatch(w2,a))||(teamMatch(w2,h)&&teamMatch(w1,a));
+    })||null;
   }
-
-  // EXACT bracket order from reference image:
-  // Left (top→bottom): GER-PAR, FRA-SWE, RSA-CAN, NED-MAR, POR-CRO, ESP-AUT, USA-BIH, BEL-SEN
-  // Right (top→bottom): BRA-JPN, CIV-NOR, MEX-ECU, ENG-COD, ARG-CPV, AUS-EGY, SUI-ALG, COL-GHA
-  const L=[
-    fm('Germany','Paraguay'),fm('France','Sweden'),
-    fm('South Africa','Canada'),fm('Netherlands','Morocco'),
-    fm('Portugal','Croatia'),fm('Spain','Austria'),
-    fm('USA','Bosnia'),fm('Belgium','Senegal'),
-  ];
-  const R=[
-    fm('Brazil','Japan'),fm('Ivory Coast','Norway'),
-    fm('Mexico','Ecuador'),fm('England','Congo'),
-    fm('Argentina','Cape Verde'),fm('Australia','Egypt'),
-    fm('Switzerland','Algeria'),fm('Colombia','Ghana'),
-  ];
-
-  // Find 8-del/kvart/semi by tracking actual winners
+  const L=[fm('Germany','Paraguay'),fm('France','Sweden'),fm('South Africa','Canada'),fm('Netherlands','Morocco'),fm('Portugal','Croatia'),fm('Spain','Austria'),fm('USA','Bosnia'),fm('Belgium','Senegal')];
+  const R=[fm('Brazil','Japan'),fm('Ivory Coast','Norway'),fm('Mexico','Ecuador'),fm('England','Congo'),fm('Argentina','Cape Verde'),fm('Australia','Egypt'),fm('Switzerland','Algeria'),fm('Colombia','Ghana')];
   function getL8(i){return findKO('LAST_16',winnerOf(L[i*2]),winnerOf(L[i*2+1]));}
   function getR8(i){return findKO('LAST_16',winnerOf(R[i*2]),winnerOf(R[i*2+1]));}
   const L8=[getL8(0),getL8(1),getL8(2),getL8(3)];
   const R8=[getR8(0),getR8(1),getR8(2),getR8(3)];
-
   function getLQ(i){return findKO('QUARTER_FINALS',winnerOf(L8[i*2]),winnerOf(L8[i*2+1]));}
   function getRQ(i){return findKO('QUARTER_FINALS',winnerOf(R8[i*2]),winnerOf(R8[i*2+1]));}
-  const LQ=[getLQ(0),getLQ(1)];
-  const RQ=[getRQ(0),getRQ(1)];
-
+  const LQ=[getLQ(0),getLQ(1)],RQ=[getRQ(0),getRQ(1)];
   const LS=findKO('SEMI_FINALS',winnerOf(LQ[0]),winnerOf(LQ[1]));
   const RS=findKO('SEMI_FINALS',winnerOf(RQ[0]),winnerOf(RQ[1]));
   const FIN=state.matches.find(m=>m.stage==='FINAL')||null;
   const BRO=state.matches.find(m=>m.stage==='THIRD_PLACE')||null;
-
   function p(level,i){const sp=unit*Math.pow(2,level);return (sp-MH)/2+i*sp;}
-  const H=p(0,7)+MH+(MH+GAP)/2;
-  const W=MW+CONN;
-
+  const H=p(0,7)+MH+(MH+GAP)/2,W=MW+CONN;
   function line(y1,y2,isRight){
     const lh=y2-y1,mx=isRight?CONN*0.4:CONN*0.6,ex=isRight?CONN:0;
     return `<svg style="position:absolute;top:${y1}px;left:${isRight?0:MW}px;overflow:visible" width="${CONN}" height="${lh}" xmlns="http://www.w3.org/2000/svg">
@@ -495,7 +461,6 @@ function renderPlayoff(){
     </svg>`;
   }
   function lbl(t){return `<div style="font-size:10px;font-weight:800;color:var(--soft);text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">${t}</div>`;}
-
   function buildLeft(){
     let out='',inner='';
     for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:0">${card(L[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,false);}
@@ -509,7 +474,6 @@ function renderPlayoff(){
     out+=`<div style="flex-shrink:0;width:${W}px">${lbl('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:0">${card(LS)}</div></div></div>`;
     return out;
   }
-
   function buildRight(){
     let out='',inner='';
     out+=`<div style="flex-shrink:0;width:${W}px">${lbl('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:${CONN}px">${card(RS)}</div></div></div>`;
@@ -524,7 +488,6 @@ function renderPlayoff(){
     out+=`<div style="flex-shrink:0;width:${W}px">${lbl('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
     return out;
   }
-
   const bronze=BRO?`<div style="margin-top:20px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Bronsmatch</div>${card(BRO)}</div>`:'';
   const finCard=FIN?card(FIN):`<div class="bracket-match"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>`;
   const finCol=`<div style="flex-shrink:0;width:180px;display:flex;flex-direction:column;align-items:center">
@@ -533,11 +496,9 @@ function renderPlayoff(){
       ${finCard}<div style="font-size:32px;line-height:1">🏆</div>${bronze}
     </div>
   </div>`;
-
   document.getElementById('playoff-content').innerHTML=`<div class="bracket-wrapper">${buildLeft()}${finCol}${buildRight()}</div>`;
 }
 function renderPlayoffStatic(){document.getElementById('playoff-content').innerHTML='<div class="empty" style="padding:3rem"><div class="empty-icon">🏆</div>Slutspelet börjar när gruppspelet är klart</div>';}
-
 function renderScorers(){
   const el=document.getElementById('scorers-content');
   if(!state.scorers.length){el.innerHTML='<div class="empty"><div class="empty-icon">👟</div>Inga skytteligadata ännu</div>';if(state.players.length)el.innerHTML+=renderScorerTips('malskytt1','Målskytt 1-tips')+renderScorerTips('skytteliga','Skytteligavinnare-tips');return;}
