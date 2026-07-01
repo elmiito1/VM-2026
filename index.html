@@ -267,11 +267,6 @@ async function loadMatchData(){
 function getActualAdvancers(){
   const rounds=[[],[],[],[],[]];
   if(!state.matches.length)return rounds;
-  // rounds[0] = alla lag i LAST_32 → 1p för 16-delsfinal
-  // rounds[1] = vinnare av LAST_32 → 1p för åttondelsfinaler
-  // rounds[2] = vinnare av LAST_16 → 1p för kvartsfinaler
-  // rounds[3] = vinnare av QUARTER_FINALS → 1p för semifinaler
-  // rounds[4] = vinnare av SEMI_FINALS → 1p för finalen
   for(const m of state.matches.filter(m=>m.stage==='LAST_32')){
     const h=m.homeTeam?.shortName||m.homeTeam?.name,a=m.awayTeam?.shortName||m.awayTeam?.name;
     if(h&&!rounds[0].includes(h))rounds[0].push(h);
@@ -320,12 +315,12 @@ function calcAllScores(){
         if(tipped&&actual&&teamMatch(tipped,actual)){p.total+=1;p.breakdown[`grupp_${groups[gi]}_pos${pos+1}`]=1;}
       }
     }
-    const countedIds=new Set();
+    // Varje fält räknas separat — dubbla tips på samma spelare ger dubbla poäng
     for(const field of['malskytt1','malskytt2']){
       const tipped=(p[field]||'').trim();if(!tipped)continue;
       for(const s of state.scorers){
-        const pName=s.player?.name||'',pid=s.player?.id||pName,goals=s.goals||0;
-        if(goals>0&&scorerMatch(tipped,pName)&&!countedIds.has(pid)){countedIds.add(pid);p.total+=goals;p.breakdown[`scorer_${field}`]=(p.breakdown[`scorer_${field}`]||0)+goals;}
+        const pName=s.player?.name||'',goals=s.goals||s.numberOfGoals||0;
+        if(goals>0&&scorerMatch(tipped,pName)){p.total+=goals;p.breakdown[`scorer_${field}`]=(p.breakdown[`scorer_${field}`]||0)+goals;break;}
       }
     }
     const advancers=getActualAdvancers();
@@ -565,10 +560,11 @@ function showDetail(name){
   const idx=[...state.players].sort((a,b)=>b.total-a.total).findIndex(x=>x.name===name);
   const color=COLORS[Math.max(0,idx)%COLORS.length];
   const ms1Goals=(()=>{const t=(p.malskytt1||'').trim();if(!t||!state.scorers.length)return null;const s=state.scorers.find(s=>scorerMatch(t,s.player?.name||''));return s?s.goals||0:null;})();
-  const ms2Goals=(()=>{const t=(p.malskytt2||'').trim();if(!t||!state.scorers.length)return null;if(p.malskytt1&&scorerMatch(p.malskytt1,p.malskytt2))return null;const s=state.scorers.find(s=>scorerMatch(t,s.player?.name||''));return s?s.goals||0:null;})();
+  const ms2Goals=(()=>{const t=(p.malskytt2||'').trim();if(!t||!state.scorers.length)return null;const s=state.scorers.find(s=>scorerMatch(t,s.player?.name||''));return s?s.goals||0:null;})();
   function msItem(label,pts,val,goals){return `<div class="detail-item"><div class="detail-item-label">${label} <span style="font-weight:400;color:var(--soft)">(${pts})</span></div><div class="detail-item-val">${escHtml(val||'')||'<span style="color:var(--soft)">–</span>'}${goals!==null?`<span style="color:var(--green);font-size:11px;margin-left:6px">${goals}⚽ = ${goals}p</span>`:''}</div></div>`;}
   const indivRows=[
-    msItem('Målskytt 1','1p/mål',p.malskytt1,ms1Goals),msItem('Målskytt 2','1p/mål',p.malskytt2,ms2Goals),
+    msItem('Målskytt 1','1p/mål',p.malskytt1,ms1Goals),
+    msItem('Målskytt 2','1p/mål',p.malskytt2,ms2Goals),
     `<div class="detail-item"><div class="detail-item-label">Skytteligavinnare <span style="font-weight:400;color:var(--soft)">(2p)</span></div><div class="detail-item-val">${escHtml(p.skytteliga||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
     `<div class="detail-item"><div class="detail-item-label">Assistspelare <span style="font-weight:400;color:var(--soft)">(1p/assist)</span></div><div class="detail-item-val">${escHtml(p.assist||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
     `<div class="detail-item"><div class="detail-item-label">Vinnare assistligan <span style="font-weight:400;color:var(--soft)">(2p)</span></div><div class="detail-item-val">${escHtml(p.assistliga||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
@@ -598,7 +594,6 @@ function showDetail(name){
     const isDone=actual.length>0||totalPts>0;
     const rows=tips.map(tip=>{
       const pts=p.breakdown?.[`playoff_r${ri}_${tip}`]||0;
-      const inActual=actual.some(a=>teamMatch(tip,a));
       const showResult=pts>0||isDone;
       return `<tr style="font-size:11px">
         <td style="padding:5px 12px;color:${pts>0?'var(--green)':'var(--text)'};font-weight:${pts>0?'700':'400'}">${tip}</td>
