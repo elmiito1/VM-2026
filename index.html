@@ -201,7 +201,8 @@ const API_KEY='6b8de6ca938e4639990358e7f7a01233';
 const API_BASE='https://nameless-smoke-8fa8.fredrik-widaeus-elmehagen-9481.workers.dev/v4';
 const BDL_KEY='8f2bd4ed-4b87-4276-b1e7-0d381e357068';
 const BDL_BASE='https://api.balldontlie.io/fifa/worldcup/v1';
-const REFRESH_MS=300000;
+const REFRESH_MS=300000;       // 5 min — matchdata
+const ASSIST_REFRESH_MS=1800000; // 30 min — assistdata
 const COLORS=['#1a6b3c','#2563eb','#7c3aed','#db2777','#b45309','#0891b2','#059669','#dc2626','#4f46e5','#0d9488','#c2410c','#0284c7'];
 const TEAM_MAP={'mexiko':'Mexico','sydafrika':'South Africa','sydkorea':'Korea Republic','tjeckien':'Czech Republic','kanada':'Canada','qatar':'Qatar','schweiz':'Switzerland','bosnien & hercegovina':'Bosnia and Herzegovina','b&h':'Bosnia and Herzegovina','brasilien':'Brazil','haiti':'Haiti','marocko':'Morocco','skottland':'Scotland','usa':'USA','paraguay':'Paraguay','australien':'Australia','turkiet':'Turkey','tyskland':'Germany','curacao':'Curaçao','elfenbenskusten':'Ivory Coast','ecuador':'Ecuador','nederländerna':'Netherlands','japan':'Japan','sverige':'Sweden','tunisien':'Tunisia','belgien':'Belgium','egypten':'Egypt','iran':'Iran','nya zeeland':'New Zealand','spanien':'Spain','kap verde':'Cabo Verde','saudiarabien':'Saudi Arabia','uruguay':'Uruguay','frankrike':'France','senegal':'Senegal','norge':'Norway','irak':'Iraq','argentina':'Argentina','algeriet':'Algeria','österrike':'Austria','jordanien':'Jordan','portugal':'Portugal','kongo':'Congo','uzbekistan':'Uzbekistan','colombia':'Colombia','england':'England','kroatien':'Croatia','ghana':'Ghana','panama':'Panama'};
 const ENG_TO_SWE={'Mexico':'Mexiko','South Africa':'Sydafrika','Korea Republic':'Sydkorea','Czechia':'Tjeckien','Czech Republic':'Tjeckien','Canada':'Kanada','Switzerland':'Schweiz','Bosnia and Herzegovina':'Bosnien & Hercegovina','Bosnia-H.':'Bosnien & Hercegovina','Brazil':'Brasilien','Morocco':'Marocko','Scotland':'Skottland','Australia':'Australien','Turkey':'Turkiet','Germany':'Tyskland',"Côte d'Ivoire":'Elfenbenskusten','Ivory Coast':'Elfenbenskusten','Netherlands':'Nederländerna','Sweden':'Sverige','Tunisia':'Tunisien','Belgium':'Belgien','Egypt':'Egypten','New Zealand':'Nya Zeeland','Cape Verde':'Kap Verde','Cape Verde Islands':'Kap Verde','Cabo Verde':'Kap Verde','Saudi Arabia':'Saudiarabien','France':'Frankrike','Norway':'Norge','Iraq':'Irak','Algeria':'Algeriet','Austria':'Österrike','Jordan':'Jordanien','Congo DR':'Kongo','Congo':'Kongo','Croatia':'Kroatien','Spain':'Spanien','England':'England','Portugal':'Portugal','Colombia':'Colombia','Uruguay':'Uruguay','Argentina':'Argentina','Ghana':'Ghana','Panama':'Panama','Japan':'Japan','Ecuador':'Ecuador','Senegal':'Senegal','Iran':'Iran','Paraguay':'Paraguay','Uzbekistan':'Uzbekistan','Haiti':'Haiti','Qatar':'Qatar','USA':'USA','United States':'USA'};
@@ -220,28 +221,35 @@ function teamMatch(tip,actual){
   if(toEng(tip).toLowerCase()===a)return true;
   return false;
 }
+function assistMatch(tip,apiName){
+  if(!tip||!apiName)return false;
+  const t=tip.toLowerCase().trim(),a=apiName.toLowerCase().trim();
+  if(t===a)return true;
+  const ap=a.split(' ');
+  if(ap.length>1&&ap[ap.length-1]===t.split(' ').pop())return true;
+  if(a.includes(t)||t.includes(ap[ap.length-1]))return true;
+  return false;
+}
 const GROUP_PLACEMENT_COLS=[[20,21,22,23],[36,37,38,39],[52,53,54,55],[68,69,70,71],[84,85,86,87],[100,101,102,103],[116,117,118,119],[132,133,134,135],[148,149,150,151],[164,165,166,167],[180,181,182,183],[196,197,198,199]];
 const PLAYOFF_ROUND_COLS=[{col:203,count:32,name:'32 lag → 16-delsfinal',pts:1},{col:236,count:16,name:'16 lag → Åttondelsfinaler',pts:1},{col:252,count:8,name:'8 lag → Kvartsfinaler',pts:1},{col:260,count:4,name:'4 lag → Semifinaler',pts:1},{col:264,count:2,name:'2 lag → Final',pts:1}];
 let state={players:[],matches:[],standings:{},scorers:[],assists:[],matchResults:{},lastFetch:null,apiOk:false};
 function initials(n){return n.replace(/\(.*?\)/g,'').trim().split(/\s+/).map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';}
 function switchTab(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');const tb=document.querySelector('[data-tab="'+id+'"]');if(tb)tb.classList.add('active');}
 async function fetchAPI(path){try{const r=await fetch(`${API_BASE}${path}`,{headers:{'X-Auth-Token':API_KEY}});if(!r.ok)throw new Error(`HTTP ${r.status}`);return await r.json();}catch(e){console.warn('API:',e);return null;}}
-async function fetchBDL(path){try{const r=await fetch(`${BDL_BASE}${path}`,{headers:{'Authorization':BDL_KEY}});if(!r.ok)throw new Error(`HTTP ${r.status}`);return await r.json();}catch(e){console.warn('BDL API:',e);return null;}}
+async function fetchBDL(path){try{const r=await fetch(`${BDL_BASE}${path}`,{headers:{'Authorization':BDL_KEY}});if(!r.ok)throw new Error(`HTTP ${r.status}`);return await r.json();}catch(e){console.warn('BDL:',e);return null;}}
 async function loadAssists(){
   try{
-    // Fetch all rosters with assists, paginate through all pages
-    let all=[], cursor=null;
-    do {
+    let all=[],cursor=null;
+    do{
       const url=cursor?`/rosters?seasons[]=2026&per_page=100&cursor=${cursor}`:`/rosters?seasons[]=2026&per_page=100`;
       const data=await fetchBDL(url);
       if(!data||!data.data)break;
       all=[...all,...data.data];
       cursor=data.meta?.next_cursor||null;
-    } while(cursor);
-    // Filter players with assists > 0, sort by assists desc
+    }while(cursor);
     state.assists=all.filter(p=>p.assists>0).sort((a,b)=>b.assists-a.assists);
-    console.log('Assists laddade:',state.assists.length,'spelare med assist');
-  } catch(e){console.warn('Assists error:',e);}
+    console.log('Assists:',state.assists.length,'spelare');
+  }catch(e){console.warn('Assists error:',e);}
 }
 function buildStandingsFromMatches(matches){
   const standings={},teamRecords={};
@@ -301,15 +309,6 @@ function getActualAdvancers(){
   }
   return rounds;
 }
-function assistMatch(tip,apiName){
-  if(!tip||!apiName)return false;
-  const t=tip.toLowerCase().trim(),a=apiName.toLowerCase().trim();
-  if(t===a)return true;
-  const ap=a.split(' ');
-  if(ap.length>1&&ap[ap.length-1]===t.split(' ').pop())return true;
-  if(a.includes(t)||t.includes(ap[ap.length-1]))return true;
-  return false;
-}
 function calcAllScores(){
   for(const p of state.players){
     p.total=0;p.breakdown={};
@@ -343,7 +342,6 @@ function calcAllScores(){
         if(tipped&&actual&&teamMatch(tipped,actual)){p.total+=1;p.breakdown[`grupp_${groups[gi]}_pos${pos+1}`]=1;}
       }
     }
-    // Målskyttar — varje fält räknas separat
     for(const field of['malskytt1','malskytt2']){
       const tipped=(p[field]||'').trim();if(!tipped)continue;
       for(const s of state.scorers){
@@ -351,17 +349,11 @@ function calcAllScores(){
         if(goals>0&&scorerMatch(tipped,pName)){p.total+=goals;p.breakdown[`scorer_${field}`]=(p.breakdown[`scorer_${field}`]||0)+goals;break;}
       }
     }
-    // Assistspelare — från BallDontLie API
     const assistTip=(p.assist||'').trim();
     if(assistTip&&state.assists.length){
       for(const a of state.assists){
-        const pName=a.player?.name||'';
-        const assists=a.assists||0;
-        if(assists>0&&assistMatch(assistTip,pName)){
-          p.total+=assists;
-          p.breakdown['assist_player']=(p.breakdown['assist_player']||0)+assists;
-          break;
-        }
+        const pName=a.player?.name||'',assists=a.assists||0;
+        if(assists>0&&assistMatch(assistTip,pName)){p.total+=assists;p.breakdown['assist_player']=(p.breakdown['assist_player']||0)+assists;break;}
       }
     }
     const advancers=getActualAdvancers();
@@ -450,10 +442,7 @@ function renderPlayoff(){
     const sc=m.score?.fullTime,fin=m.status==='FINISHED',live=m.status==='IN_PLAY'||m.status==='PAUSED';
     const hW=fin&&sc?.home>sc?.away,aW=fin&&sc?.away>sc?.home;
     const hS=fin?(sc?.home??''):live?'●':'',aS=fin?(sc?.away??''):live?'●':'';
-    return `<div class="bracket-match">
-      <div class="bracket-team ${hW?'winner':fin?'loser':h==='TBD'?'tbd':''}">${escHtml(toSwe(h))}${hS!==''?`<span class="bracket-score">${hS}</span>`:''}</div>
-      <div class="bracket-team ${aW?'winner':fin?'loser':a==='TBD'?'tbd':''}">${escHtml(toSwe(a))}${aS!==''?`<span class="bracket-score">${aS}</span>`:''}</div>
-    </div>`;
+    return `<div class="bracket-match"><div class="bracket-team ${hW?'winner':fin?'loser':h==='TBD'?'tbd':''}">${escHtml(toSwe(h))}${hS!==''?`<span class="bracket-score">${hS}</span>`:''}</div><div class="bracket-team ${aW?'winner':fin?'loser':a==='TBD'?'tbd':''}">${escHtml(toSwe(a))}${aS!==''?`<span class="bracket-score">${aS}</span>`:''}</div></div>`;
   }
   function fm(t1,t2){return state.matches.find(m=>{const h=m.homeTeam?.shortName||m.homeTeam?.name||'',a=m.awayTeam?.shortName||m.awayTeam?.name||'';return (teamMatch(t1,h)&&teamMatch(t2,a))||(teamMatch(t2,h)&&teamMatch(t1,a));})||null;}
   function winnerOf(m){if(!m||m.status!=='FINISHED')return null;const sc=m.score?.fullTime;if(!sc)return null;if(sc.home>sc.away)return m.homeTeam?.shortName||m.homeTeam?.name;if(sc.away>sc.home)return m.awayTeam?.shortName||m.awayTeam?.name;return null;}
@@ -507,12 +496,9 @@ function renderAssists(){
   }
   const tippers={};
   for(const p of state.players){const n=(p.assist||'').trim().toLowerCase();if(n){if(!tippers[n])tippers[n]=[];tippers[n].push(p.name);}}
-  const top20=state.assists.slice(0,20);
   el.innerHTML=`<table class="scorer-table"><thead><tr><th>#</th><th>Spelare</th><th style="text-align:center">Assist</th></tr></thead><tbody>`+
-    top20.map((s,i)=>{
-      const pName=s.player?.name||'?';
-      const country=s.player?.country_name||'';
-      const assists=s.assists||0;
+    state.assists.slice(0,20).map((s,i)=>{
+      const pName=s.player?.name||'?',country=s.player?.country_name||'',assists=s.assists||0;
       const mt=Object.entries(tippers).filter(([n])=>pName.toLowerCase().includes(n)||n.includes(pName.toLowerCase().split(' ')[0])).flatMap(([,t])=>t);
       return `<tr><td class="scorer-rank">${i+1}</td><td><div class="scorer-name">${pName}</div><div class="scorer-team">${country}</div>${mt.length?`<div class="tippers-chips">${[...new Set(mt)].map(t=>`<span class="tipper-chip">${t.split(' ')[0]}</span>`).join('')}</div>`:''}</td><td class="scorer-goals">${assists}</td></tr>`;
     }).join('')+'</tbody></table>';
@@ -642,18 +628,27 @@ async function loadTipsFromGitHub(){
 }
 async function init(){
   await loadTipsFromGitHub();
-  await Promise.all([loadMatchData(), loadAssists()]);
+  await Promise.all([loadMatchData(),loadAssists()]);
   if(state.players.length&&state.apiOk){
     calcAllScores();
     renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();
   }
+  // Matchdata var 5:e minut
   setInterval(async()=>{
-    await Promise.all([loadMatchData(), loadAssists()]);
+    await loadMatchData();
     if(state.players.length&&state.apiOk){
       calcAllScores();
-      renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();
+      renderLeaderboard();renderMetrics();renderTips();renderScorers();renderPlayoffTips();
     }
   },REFRESH_MS);
+  // Assistdata var 30:e minut
+  setInterval(async()=>{
+    await loadAssists();
+    if(state.players.length&&state.apiOk){
+      calcAllScores();
+      renderLeaderboard();renderMetrics();renderAssists();
+    }
+  },ASSIST_REFRESH_MS);
 }
 init();
 </script>
