@@ -201,8 +201,8 @@ const API_KEY='6b8de6ca938e4639990358e7f7a01233';
 const API_BASE='https://nameless-smoke-8fa8.fredrik-widaeus-elmehagen-9481.workers.dev/v4';
 const BDL_KEY='8f2bd4ed-4b87-4276-b1e7-0d381e357068';
 const BDL_BASE='https://api.balldontlie.io/fifa/worldcup/v1';
-const REFRESH_MS=300000;       // 5 min — matchdata
-const ASSIST_REFRESH_MS=1800000; // 30 min — assistdata
+const REFRESH_MS=300000;
+const ASSIST_REFRESH_MS=1800000;
 const COLORS=['#1a6b3c','#2563eb','#7c3aed','#db2777','#b45309','#0891b2','#059669','#dc2626','#4f46e5','#0d9488','#c2410c','#0284c7'];
 const TEAM_MAP={'mexiko':'Mexico','sydafrika':'South Africa','sydkorea':'Korea Republic','tjeckien':'Czech Republic','kanada':'Canada','qatar':'Qatar','schweiz':'Switzerland','bosnien & hercegovina':'Bosnia and Herzegovina','b&h':'Bosnia and Herzegovina','brasilien':'Brazil','haiti':'Haiti','marocko':'Morocco','skottland':'Scotland','usa':'USA','paraguay':'Paraguay','australien':'Australia','turkiet':'Turkey','tyskland':'Germany','curacao':'Curaçao','elfenbenskusten':'Ivory Coast','ecuador':'Ecuador','nederländerna':'Netherlands','japan':'Japan','sverige':'Sweden','tunisien':'Tunisia','belgien':'Belgium','egypten':'Egypt','iran':'Iran','nya zeeland':'New Zealand','spanien':'Spain','kap verde':'Cabo Verde','saudiarabien':'Saudi Arabia','uruguay':'Uruguay','frankrike':'France','senegal':'Senegal','norge':'Norway','irak':'Iraq','argentina':'Argentina','algeriet':'Algeria','österrike':'Austria','jordanien':'Jordan','portugal':'Portugal','kongo':'Congo','uzbekistan':'Uzbekistan','colombia':'Colombia','england':'England','kroatien':'Croatia','ghana':'Ghana','panama':'Panama'};
 const ENG_TO_SWE={'Mexico':'Mexiko','South Africa':'Sydafrika','Korea Republic':'Sydkorea','Czechia':'Tjeckien','Czech Republic':'Tjeckien','Canada':'Kanada','Switzerland':'Schweiz','Bosnia and Herzegovina':'Bosnien & Hercegovina','Bosnia-H.':'Bosnien & Hercegovina','Brazil':'Brasilien','Morocco':'Marocko','Scotland':'Skottland','Australia':'Australien','Turkey':'Turkiet','Germany':'Tyskland',"Côte d'Ivoire":'Elfenbenskusten','Ivory Coast':'Elfenbenskusten','Netherlands':'Nederländerna','Sweden':'Sverige','Tunisia':'Tunisien','Belgium':'Belgien','Egypt':'Egypten','New Zealand':'Nya Zeeland','Cape Verde':'Kap Verde','Cape Verde Islands':'Kap Verde','Cabo Verde':'Kap Verde','Saudi Arabia':'Saudiarabien','France':'Frankrike','Norway':'Norge','Iraq':'Irak','Algeria':'Algeriet','Austria':'Österrike','Jordan':'Jordanien','Congo DR':'Kongo','Congo':'Kongo','Croatia':'Kroatien','Spain':'Spanien','England':'England','Portugal':'Portugal','Colombia':'Colombia','Uruguay':'Uruguay','Argentina':'Argentina','Ghana':'Ghana','Panama':'Panama','Japan':'Japan','Ecuador':'Ecuador','Senegal':'Senegal','Iran':'Iran','Paraguay':'Paraguay','Uzbekistan':'Uzbekistan','Haiti':'Haiti','Qatar':'Qatar','USA':'USA','United States':'USA'};
@@ -480,12 +480,17 @@ function renderScorers(){
   if(!state.scorers.length){el.innerHTML='<div class="empty"><div class="empty-icon">👟</div>Inga skytteligadata ännu</div>';if(state.players.length)el.innerHTML+=renderScorerTips('malskytt1','Målskytt 1-tips')+renderScorerTips('skytteliga','Skytteligavinnare-tips');return;}
   const tippers={};
   for(const p of state.players)for(const f of['malskytt1','malskytt2']){const n=(p[f]||'').trim().toLowerCase();if(n){if(!tippers[n])tippers[n]=[];tippers[n].push(p.name);}}
+  const tipperPts={};
+  for(const p of state.players){const pts=(p.breakdown?.['scorer_malskytt1']||0)+(p.breakdown?.['scorer_malskytt2']||0);if(pts>0)tipperPts[p.name]=pts;}
   el.innerHTML=`<table class="scorer-table"><thead><tr><th>#</th><th>Spelare</th><th style="text-align:center">Mål</th></tr></thead><tbody>`+
     state.scorers.map((s,i)=>{
       const pName=s.player?.name||'?',team=toSwe(s.team?.shortName||s.team?.name||''),goals=s.goals||0;
       const mt=Object.entries(tippers).filter(([n])=>pName.toLowerCase().includes(n)||n.includes(pName.toLowerCase().split(' ')[0])).flatMap(([,t])=>t);
-      return `<tr><td class="scorer-rank">${i+1}</td><td><div class="scorer-name">${pName}</div><div class="scorer-team">${team}</div>${mt.length?`<div class="tippers-chips">${[...new Set(mt)].map(t=>`<span class="tipper-chip">${t.split(' ')[0]}</span>`).join('')}</div>`:''}</td><td class="scorer-goals">${goals}</td></tr>`;
+      const uniqueTippers=[...new Set(mt)];
+      const tipperChips=uniqueTippers.map(t=>{const pts=tipperPts[t]||0;return `<span class="tipper-chip" style="${pts>0?'background:var(--green-mid);color:#065f46':''}">${t.split(' ')[0]}${pts>0?` +${pts}p`:''}</span>`;}).join('');
+      return `<tr><td class="scorer-rank">${i+1}</td><td><div class="scorer-name">${pName}</div><div class="scorer-team">${team}</div>${uniqueTippers.length?`<div class="tippers-chips">${tipperChips}</div>`:''}</td><td class="scorer-goals">${goals}</td></tr>`;
     }).join('')+'</tbody></table>';
+  if(state.players.length)el.innerHTML+=renderScorerTips('skytteliga','Skytteligavinnare-tips');
 }
 function renderAssists(){
   const el=document.getElementById('assists-content');
@@ -496,11 +501,15 @@ function renderAssists(){
   }
   const tippers={};
   for(const p of state.players){const n=(p.assist||'').trim().toLowerCase();if(n){if(!tippers[n])tippers[n]=[];tippers[n].push(p.name);}}
+  const tipperPts={};
+  for(const p of state.players){const pts=p.breakdown?.['assist_player']||0;if(pts>0)tipperPts[p.name]=pts;}
   el.innerHTML=`<table class="scorer-table"><thead><tr><th>#</th><th>Spelare</th><th style="text-align:center">Assist</th></tr></thead><tbody>`+
     state.assists.slice(0,20).map((s,i)=>{
       const pName=s.player?.name||'?',country=s.player?.country_name||'',assists=s.assists||0;
-      const mt=Object.entries(tippers).filter(([n])=>pName.toLowerCase().includes(n)||n.includes(pName.toLowerCase().split(' ')[0])).flatMap(([,t])=>t);
-      return `<tr><td class="scorer-rank">${i+1}</td><td><div class="scorer-name">${pName}</div><div class="scorer-team">${country}</div>${mt.length?`<div class="tippers-chips">${[...new Set(mt)].map(t=>`<span class="tipper-chip">${t.split(' ')[0]}</span>`).join('')}</div>`:''}</td><td class="scorer-goals">${assists}</td></tr>`;
+      const mt=Object.entries(tippers).filter(([n])=>pName.toLowerCase().includes(n)||n.includes(pName.toLowerCase().split(' ').pop())).flatMap(([,t])=>t);
+      const uniqueTippers=[...new Set(mt)];
+      const tipperChips=uniqueTippers.map(t=>{const pts=tipperPts[t]||0;return `<span class="tipper-chip" style="${pts>0?'background:var(--green-mid);color:#065f46':''}">${t.split(' ')[0]}${pts>0?` +${pts}p`:''}</span>`;}).join('');
+      return `<tr><td class="scorer-rank">${i+1}</td><td><div class="scorer-name">${pName}</div><div class="scorer-team">${country}</div>${uniqueTippers.length?`<div class="tippers-chips">${tipperChips}</div>`:''}</td><td class="scorer-goals">${assists}</td></tr>`;
     }).join('')+'</tbody></table>';
   if(state.players.length)el.innerHTML+=renderScorerTips('assistliga','Assistligavinnare-tips');
 }
