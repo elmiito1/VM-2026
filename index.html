@@ -186,7 +186,7 @@ input[type=file]{display:none}
 </div>
 <div id="page-assists" class="page">
   <div class="section-label">Assistliga – live</div>
-  <div id="assists-content"><div class="loading">⏳ Hämtar assistligedata...</div></div>
+  <div id="assists-content"><div class="loading">⏳ Hämtar assistdata...</div></div>
 </div>
 <div id="page-playofftips" class="page">
   <div class="section-label">Grupplaceringstips & slutspelslagstips</div>
@@ -199,6 +199,8 @@ input[type=file]{display:none}
 <script>
 const API_KEY='6b8de6ca938e4639990358e7f7a01233';
 const API_BASE='https://nameless-smoke-8fa8.fredrik-widaeus-elmehagen-9481.workers.dev/v4';
+const BDL_KEY='8f2bd4ed-4b87-4276-b1e7-0d381e357068';
+const BDL_BASE='https://api.balldontlie.io/fifa/worldcup/v1';
 const REFRESH_MS=300000;
 const COLORS=['#1a6b3c','#2563eb','#7c3aed','#db2777','#b45309','#0891b2','#059669','#dc2626','#4f46e5','#0d9488','#c2410c','#0284c7'];
 const TEAM_MAP={'mexiko':'Mexico','sydafrika':'South Africa','sydkorea':'Korea Republic','tjeckien':'Czech Republic','kanada':'Canada','qatar':'Qatar','schweiz':'Switzerland','bosnien & hercegovina':'Bosnia and Herzegovina','b&h':'Bosnia and Herzegovina','brasilien':'Brazil','haiti':'Haiti','marocko':'Morocco','skottland':'Scotland','usa':'USA','paraguay':'Paraguay','australien':'Australia','turkiet':'Turkey','tyskland':'Germany','curacao':'Curaçao','elfenbenskusten':'Ivory Coast','ecuador':'Ecuador','nederländerna':'Netherlands','japan':'Japan','sverige':'Sweden','tunisien':'Tunisia','belgien':'Belgium','egypten':'Egypt','iran':'Iran','nya zeeland':'New Zealand','spanien':'Spain','kap verde':'Cabo Verde','saudiarabien':'Saudi Arabia','uruguay':'Uruguay','frankrike':'France','senegal':'Senegal','norge':'Norway','irak':'Iraq','argentina':'Argentina','algeriet':'Algeria','österrike':'Austria','jordanien':'Jordan','portugal':'Portugal','kongo':'Congo','uzbekistan':'Uzbekistan','colombia':'Colombia','england':'England','kroatien':'Croatia','ghana':'Ghana','panama':'Panama'};
@@ -220,10 +222,27 @@ function teamMatch(tip,actual){
 }
 const GROUP_PLACEMENT_COLS=[[20,21,22,23],[36,37,38,39],[52,53,54,55],[68,69,70,71],[84,85,86,87],[100,101,102,103],[116,117,118,119],[132,133,134,135],[148,149,150,151],[164,165,166,167],[180,181,182,183],[196,197,198,199]];
 const PLAYOFF_ROUND_COLS=[{col:203,count:32,name:'32 lag → 16-delsfinal',pts:1},{col:236,count:16,name:'16 lag → Åttondelsfinaler',pts:1},{col:252,count:8,name:'8 lag → Kvartsfinaler',pts:1},{col:260,count:4,name:'4 lag → Semifinaler',pts:1},{col:264,count:2,name:'2 lag → Final',pts:1}];
-let state={players:[],matches:[],standings:{},scorers:[],matchResults:{},lastFetch:null,apiOk:false};
+let state={players:[],matches:[],standings:{},scorers:[],assists:[],matchResults:{},lastFetch:null,apiOk:false};
 function initials(n){return n.replace(/\(.*?\)/g,'').trim().split(/\s+/).map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';}
 function switchTab(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');const tb=document.querySelector('[data-tab="'+id+'"]');if(tb)tb.classList.add('active');}
 async function fetchAPI(path){try{const r=await fetch(`${API_BASE}${path}`,{headers:{'X-Auth-Token':API_KEY}});if(!r.ok)throw new Error(`HTTP ${r.status}`);return await r.json();}catch(e){console.warn('API:',e);return null;}}
+async function fetchBDL(path){try{const r=await fetch(`${BDL_BASE}${path}`,{headers:{'Authorization':BDL_KEY}});if(!r.ok)throw new Error(`HTTP ${r.status}`);return await r.json();}catch(e){console.warn('BDL API:',e);return null;}}
+async function loadAssists(){
+  try{
+    // Fetch all rosters with assists, paginate through all pages
+    let all=[], cursor=null;
+    do {
+      const url=cursor?`/rosters?seasons[]=2026&per_page=100&cursor=${cursor}`:`/rosters?seasons[]=2026&per_page=100`;
+      const data=await fetchBDL(url);
+      if(!data||!data.data)break;
+      all=[...all,...data.data];
+      cursor=data.meta?.next_cursor||null;
+    } while(cursor);
+    // Filter players with assists > 0, sort by assists desc
+    state.assists=all.filter(p=>p.assists>0).sort((a,b)=>b.assists-a.assists);
+    console.log('Assists laddade:',state.assists.length,'spelare med assist');
+  } catch(e){console.warn('Assists error:',e);}
+}
 function buildStandingsFromMatches(matches){
   const standings={},teamRecords={};
   for(const m of matches.filter(m=>m.stage==='GROUP_STAGE')){
@@ -282,6 +301,15 @@ function getActualAdvancers(){
   }
   return rounds;
 }
+function assistMatch(tip,apiName){
+  if(!tip||!apiName)return false;
+  const t=tip.toLowerCase().trim(),a=apiName.toLowerCase().trim();
+  if(t===a)return true;
+  const ap=a.split(' ');
+  if(ap.length>1&&ap[ap.length-1]===t.split(' ').pop())return true;
+  if(a.includes(t)||t.includes(ap[ap.length-1]))return true;
+  return false;
+}
 function calcAllScores(){
   for(const p of state.players){
     p.total=0;p.breakdown={};
@@ -315,12 +343,25 @@ function calcAllScores(){
         if(tipped&&actual&&teamMatch(tipped,actual)){p.total+=1;p.breakdown[`grupp_${groups[gi]}_pos${pos+1}`]=1;}
       }
     }
-    // Varje fält räknas separat — dubbla tips på samma spelare ger dubbla poäng
+    // Målskyttar — varje fält räknas separat
     for(const field of['malskytt1','malskytt2']){
       const tipped=(p[field]||'').trim();if(!tipped)continue;
       for(const s of state.scorers){
         const pName=s.player?.name||'',goals=s.goals||s.numberOfGoals||0;
         if(goals>0&&scorerMatch(tipped,pName)){p.total+=goals;p.breakdown[`scorer_${field}`]=(p.breakdown[`scorer_${field}`]||0)+goals;break;}
+      }
+    }
+    // Assistspelare — från BallDontLie API
+    const assistTip=(p.assist||'').trim();
+    if(assistTip&&state.assists.length){
+      for(const a of state.assists){
+        const pName=a.player?.name||'';
+        const assists=a.assists||0;
+        if(assists>0&&assistMatch(assistTip,pName)){
+          p.total+=assists;
+          p.breakdown['assist_player']=(p.breakdown['assist_player']||0)+assists;
+          break;
+        }
       }
     }
     const advancers=getActualAdvancers();
@@ -414,99 +455,37 @@ function renderPlayoff(){
       <div class="bracket-team ${aW?'winner':fin?'loser':a==='TBD'?'tbd':''}">${escHtml(toSwe(a))}${aS!==''?`<span class="bracket-score">${aS}</span>`:''}</div>
     </div>`;
   }
-  function fm(t1,t2){
-    return state.matches.find(m=>{
-      const h=m.homeTeam?.shortName||m.homeTeam?.name||'',a=m.awayTeam?.shortName||m.awayTeam?.name||'';
-      return (teamMatch(t1,h)&&teamMatch(t2,a))||(teamMatch(t2,h)&&teamMatch(t1,a));
-    })||null;
-  }
-  function winnerOf(m){
-    if(!m||m.status!=='FINISHED')return null;
-    const sc=m.score?.fullTime;if(!sc)return null;
-    if(sc.home>sc.away)return m.homeTeam?.shortName||m.homeTeam?.name;
-    if(sc.away>sc.home)return m.awayTeam?.shortName||m.awayTeam?.name;
-    return null;
-  }
-  function findKO(stage,w1,w2){
-    if(!w1||!w2)return null;
-    const ms=state.matches.filter(m=>m.stage===stage);
-    return ms.find(m=>{
-      const h=m.homeTeam?.shortName||m.homeTeam?.name||'',a=m.awayTeam?.shortName||m.awayTeam?.name||'';
-      return (teamMatch(w1,h)&&teamMatch(w2,a))||(teamMatch(w2,h)&&teamMatch(w1,a));
-    })||null;
-  }
-  const L=[
-    fm('Germany','Paraguay'),fm('France','Sweden'),
-    fm('South Africa','Canada'),fm('Netherlands','Morocco'),
-    fm('Portugal','Croatia'),fm('Spain','Austria'),
-    fm('USA','Bosnia-H.'),fm('Belgium','Senegal'),
-  ];
-  const R=[
-    fm('Brazil','Japan'),fm('Ivory Coast','Norway'),
-    fm('Mexico','Ecuador'),fm('England','Congo DR'),
-    fm('Argentina','Cape Verde'),fm('Australia','Egypt'),
-    fm('Switzerland','Algeria'),fm('Colombia','Ghana'),
-  ];
+  function fm(t1,t2){return state.matches.find(m=>{const h=m.homeTeam?.shortName||m.homeTeam?.name||'',a=m.awayTeam?.shortName||m.awayTeam?.name||'';return (teamMatch(t1,h)&&teamMatch(t2,a))||(teamMatch(t2,h)&&teamMatch(t1,a));})||null;}
+  function winnerOf(m){if(!m||m.status!=='FINISHED')return null;const sc=m.score?.fullTime;if(!sc)return null;if(sc.home>sc.away)return m.homeTeam?.shortName||m.homeTeam?.name;if(sc.away>sc.home)return m.awayTeam?.shortName||m.awayTeam?.name;return null;}
+  function findKO(stage,w1,w2){if(!w1||!w2)return null;const ms=state.matches.filter(m=>m.stage===stage);return ms.find(m=>{const h=m.homeTeam?.shortName||m.homeTeam?.name||'',a=m.awayTeam?.shortName||m.awayTeam?.name||'';return (teamMatch(w1,h)&&teamMatch(w2,a))||(teamMatch(w2,h)&&teamMatch(w1,a));})||null;}
+  const L=[fm('Germany','Paraguay'),fm('France','Sweden'),fm('South Africa','Canada'),fm('Netherlands','Morocco'),fm('Portugal','Croatia'),fm('Spain','Austria'),fm('USA','Bosnia-H.'),fm('Belgium','Senegal')];
+  const R=[fm('Brazil','Japan'),fm('Ivory Coast','Norway'),fm('Mexico','Ecuador'),fm('England','Congo DR'),fm('Argentina','Cape Verde'),fm('Australia','Egypt'),fm('Switzerland','Algeria'),fm('Colombia','Ghana')];
   function getL8(i){return findKO('LAST_16',winnerOf(L[i*2]),winnerOf(L[i*2+1]));}
   function getR8(i){return findKO('LAST_16',winnerOf(R[i*2]),winnerOf(R[i*2+1]));}
-  const L8=[getL8(0),getL8(1),getL8(2),getL8(3)];
-  const R8=[getR8(0),getR8(1),getR8(2),getR8(3)];
+  const L8=[getL8(0),getL8(1),getL8(2),getL8(3)],R8=[getR8(0),getR8(1),getR8(2),getR8(3)];
   function getLQ(i){return findKO('QUARTER_FINALS',winnerOf(L8[i*2]),winnerOf(L8[i*2+1]));}
   function getRQ(i){return findKO('QUARTER_FINALS',winnerOf(R8[i*2]),winnerOf(R8[i*2+1]));}
   const LQ=[getLQ(0),getLQ(1)],RQ=[getRQ(0),getRQ(1)];
-  const LS=findKO('SEMI_FINALS',winnerOf(LQ[0]),winnerOf(LQ[1]));
-  const RS=findKO('SEMI_FINALS',winnerOf(RQ[0]),winnerOf(RQ[1]));
-  const FIN=state.matches.find(m=>m.stage==='FINAL')||null;
-  const BRO=state.matches.find(m=>m.stage==='THIRD_PLACE')||null;
+  const LS=findKO('SEMI_FINALS',winnerOf(LQ[0]),winnerOf(LQ[1])),RS=findKO('SEMI_FINALS',winnerOf(RQ[0]),winnerOf(RQ[1]));
+  const FIN=state.matches.find(m=>m.stage==='FINAL')||null,BRO=state.matches.find(m=>m.stage==='THIRD_PLACE')||null;
   function p(level,i){const sp=unit*Math.pow(2,level);return (sp-MH)/2+i*sp;}
   const H=p(0,7)+MH+(MH+GAP)/2,W=MW+CONN;
-  function line(y1,y2,isRight){
-    const lh=y2-y1,mx=isRight?CONN*0.4:CONN*0.6,ex=isRight?CONN:0;
-    return `<svg style="position:absolute;top:${y1}px;left:${isRight?0:MW}px;overflow:visible" width="${CONN}" height="${lh}" xmlns="http://www.w3.org/2000/svg">
-      <line x1="${ex}" y1="0" x2="${mx}" y2="0" stroke="#cbd5e1" stroke-width="1.5"/>
-      <line x1="${mx}" y1="0" x2="${mx}" y2="${lh}" stroke="#cbd5e1" stroke-width="1.5"/>
-      <line x1="${mx}" y1="${lh}" x2="${ex}" y2="${lh}" stroke="#cbd5e1" stroke-width="1.5"/>
-    </svg>`;
-  }
+  function line(y1,y2,isRight){const lh=y2-y1,mx=isRight?CONN*0.4:CONN*0.6,ex=isRight?CONN:0;return `<svg style="position:absolute;top:${y1}px;left:${isRight?0:MW}px;overflow:visible" width="${CONN}" height="${lh}" xmlns="http://www.w3.org/2000/svg"><line x1="${ex}" y1="0" x2="${mx}" y2="0" stroke="#cbd5e1" stroke-width="1.5"/><line x1="${mx}" y1="0" x2="${mx}" y2="${lh}" stroke="#cbd5e1" stroke-width="1.5"/><line x1="${mx}" y1="${lh}" x2="${ex}" y2="${lh}" stroke="#cbd5e1" stroke-width="1.5"/></svg>`;}
   function lbl(t){return `<div style="font-size:10px;font-weight:800;color:var(--soft);text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">${t}</div>`;}
-  function buildLeft(){
-    let out='',inner='';
-    for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:0">${card(L[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,false);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    inner='';
-    for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:0">${card(L8[i])}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,false);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    inner='';
-    for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:0">${card(LQ[i])}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,false);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:0">${card(LS)}</div></div></div>`;
-    return out;
-  }
-  function buildRight(){
-    let out='',inner='';
-    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:${CONN}px">${card(RS)}</div></div></div>`;
-    inner='';
-    for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:${CONN}px">${card(RQ[i])}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,true);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    inner='';
-    for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:${CONN}px">${card(R8[i])}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,true);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    inner='';
-    for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:${CONN}px">${card(R[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,true);}
-    out+=`<div style="flex-shrink:0;width:${W}px">${lbl('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;
-    return out;
-  }
+  function buildLeft(){let out='',inner='';for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:0">${card(L[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,false);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;inner='';for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:0">${card(L8[i])}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,false);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;inner='';for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:0">${card(LQ[i])}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,false);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;out+=`<div style="flex-shrink:0;width:${W}px">${lbl('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:0">${card(LS)}</div></div></div>`;return out;}
+  function buildRight(){let out='',inner='';out+=`<div style="flex-shrink:0;width:${W}px">${lbl('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:${CONN}px">${card(RS)}</div></div></div>`;inner='';for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:${CONN}px">${card(RQ[i])}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,true);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;inner='';for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:${CONN}px">${card(R8[i])}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,true);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;inner='';for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:${CONN}px">${card(R[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,true);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;return out;}
   const bronze=BRO?`<div style="margin-top:20px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Bronsmatch</div>${card(BRO)}</div>`:'';
   const finCard=FIN?card(FIN):`<div class="bracket-match"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>`;
-  const finCol=`<div style="flex-shrink:0;width:180px;display:flex;flex-direction:column;align-items:center">
-    <div style="font-size:10px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">⚽ FINAL</div>
-    <div style="margin-top:${p(3,0)}px;display:flex;flex-direction:column;align-items:center;gap:12px">
-      ${finCard}<div style="font-size:32px;line-height:1">🏆</div>${bronze}
-    </div>
-  </div>`;
+  const finCol=`<div style="flex-shrink:0;width:180px;display:flex;flex-direction:column;align-items:center"><div style="font-size:10px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">⚽ FINAL</div><div style="margin-top:${p(3,0)}px;display:flex;flex-direction:column;align-items:center;gap:12px">${finCard}<div style="font-size:32px;line-height:1">🏆</div>${bronze}</div></div>`;
   document.getElementById('playoff-content').innerHTML=`<div class="bracket-wrapper">${buildLeft()}${finCol}${buildRight()}</div>`;
 }
 function renderPlayoffStatic(){document.getElementById('playoff-content').innerHTML='<div class="empty" style="padding:3rem"><div class="empty-icon">🏆</div>Slutspelet börjar när gruppspelet är klart</div>';}
+function renderScorerTips(field,title){
+  const counts={};for(const p of state.players){const v=(p[field]||'').trim();if(v){if(!counts[v])counts[v]=[];counts[v].push(p.name.split(' ')[0]);}}
+  if(!Object.keys(counts).length)return '';
+  return `<div style="margin-top:1.5rem"><div class="section-label">${title}</div><div class="lb"><table class="scorer-table"><thead><tr><th>Spelare</th><th>Tippades av</th></tr></thead><tbody>`+
+    Object.entries(counts).sort((a,b)=>b[1].length-a[1].length).map(([n,t])=>`<tr><td class="scorer-name">${n}</td><td><div class="tippers-chips">${t.map(x=>`<span class="tipper-chip">${x}</span>`).join('')}</div></td></tr>`).join('')+'</tbody></table></div></div>';
+}
 function renderScorers(){
   const el=document.getElementById('scorers-content');
   if(!state.scorers.length){el.innerHTML='<div class="empty"><div class="empty-icon">👟</div>Inga skytteligadata ännu</div>';if(state.players.length)el.innerHTML+=renderScorerTips('malskytt1','Målskytt 1-tips')+renderScorerTips('skytteliga','Skytteligavinnare-tips');return;}
@@ -519,13 +498,26 @@ function renderScorers(){
       return `<tr><td class="scorer-rank">${i+1}</td><td><div class="scorer-name">${pName}</div><div class="scorer-team">${team}</div>${mt.length?`<div class="tippers-chips">${[...new Set(mt)].map(t=>`<span class="tipper-chip">${t.split(' ')[0]}</span>`).join('')}</div>`:''}</td><td class="scorer-goals">${goals}</td></tr>`;
     }).join('')+'</tbody></table>';
 }
-function renderScorerTips(field,title){
-  const counts={};for(const p of state.players){const v=(p[field]||'').trim();if(v){if(!counts[v])counts[v]=[];counts[v].push(p.name.split(' ')[0]);}}
-  if(!Object.keys(counts).length)return '';
-  return `<div style="margin-top:1.5rem"><div class="section-label">${title}</div><div class="lb"><table class="scorer-table"><thead><tr><th>Spelare</th><th>Tippades av</th></tr></thead><tbody>`+
-    Object.entries(counts).sort((a,b)=>b[1].length-a[1].length).map(([n,t])=>`<tr><td class="scorer-name">${n}</td><td><div class="tippers-chips">${t.map(x=>`<span class="tipper-chip">${x}</span>`).join('')}</div></td></tr>`).join('')+'</tbody></table></div></div>';
+function renderAssists(){
+  const el=document.getElementById('assists-content');
+  if(!state.assists.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">🎯</div>Inga assistdata ännu</div>';
+    if(state.players.length)el.innerHTML+=renderScorerTips('assist','Assistspelare-tips')+renderScorerTips('assistliga','Assistligavinnare-tips');
+    return;
+  }
+  const tippers={};
+  for(const p of state.players){const n=(p.assist||'').trim().toLowerCase();if(n){if(!tippers[n])tippers[n]=[];tippers[n].push(p.name);}}
+  const top20=state.assists.slice(0,20);
+  el.innerHTML=`<table class="scorer-table"><thead><tr><th>#</th><th>Spelare</th><th style="text-align:center">Assist</th></tr></thead><tbody>`+
+    top20.map((s,i)=>{
+      const pName=s.player?.name||'?';
+      const country=s.player?.country_name||'';
+      const assists=s.assists||0;
+      const mt=Object.entries(tippers).filter(([n])=>pName.toLowerCase().includes(n)||n.includes(pName.toLowerCase().split(' ')[0])).flatMap(([,t])=>t);
+      return `<tr><td class="scorer-rank">${i+1}</td><td><div class="scorer-name">${pName}</div><div class="scorer-team">${country}</div>${mt.length?`<div class="tippers-chips">${[...new Set(mt)].map(t=>`<span class="tipper-chip">${t.split(' ')[0]}</span>`).join('')}</div>`:''}</td><td class="scorer-goals">${assists}</td></tr>`;
+    }).join('')+'</tbody></table>';
+  if(state.players.length)el.innerHTML+=renderScorerTips('assistliga','Assistligavinnare-tips');
 }
-function renderAssists(){const el=document.getElementById('assists-content');el.innerHTML='<div class="api-notice" style="display:block">ℹ️ Live-assiststatistik kräver betalplan hos football-data.org. Visar era assisttips.</div>';if(state.players.length)el.innerHTML+=renderScorerTips('assist','Assistspelare-tips')+renderScorerTips('assistliga','Assistligavinnare-tips');}
 function renderPlayoffTips(){
   const el=document.getElementById('playofftips-content');
   if(!state.players.length){el.innerHTML='<div class="empty"><div class="empty-icon">📊</div>Ladda upp Excel för att se tips</div>';return;}
@@ -561,12 +553,13 @@ function showDetail(name){
   const color=COLORS[Math.max(0,idx)%COLORS.length];
   const ms1Goals=(()=>{const t=(p.malskytt1||'').trim();if(!t||!state.scorers.length)return null;const s=state.scorers.find(s=>scorerMatch(t,s.player?.name||''));return s?s.goals||0:null;})();
   const ms2Goals=(()=>{const t=(p.malskytt2||'').trim();if(!t||!state.scorers.length)return null;const s=state.scorers.find(s=>scorerMatch(t,s.player?.name||''));return s?s.goals||0:null;})();
-  function msItem(label,pts,val,goals){return `<div class="detail-item"><div class="detail-item-label">${label} <span style="font-weight:400;color:var(--soft)">(${pts})</span></div><div class="detail-item-val">${escHtml(val||'')||'<span style="color:var(--soft)">–</span>'}${goals!==null?`<span style="color:var(--green);font-size:11px;margin-left:6px">${goals}⚽ = ${goals}p</span>`:''}</div></div>`;}
+  const assistGoals=(()=>{const t=(p.assist||'').trim();if(!t||!state.assists.length)return null;const s=state.assists.find(s=>assistMatch(t,s.player?.name||''));return s?s.assists||0:null;})();
+  function msItem(label,pts,val,goals,unit='⚽'){return `<div class="detail-item"><div class="detail-item-label">${label} <span style="font-weight:400;color:var(--soft)">(${pts})</span></div><div class="detail-item-val">${escHtml(val||'')||'<span style="color:var(--soft)">–</span>'}${goals!==null?`<span style="color:var(--green);font-size:11px;margin-left:6px">${goals}${unit} = ${goals}p</span>`:''}</div></div>`;}
   const indivRows=[
     msItem('Målskytt 1','1p/mål',p.malskytt1,ms1Goals),
     msItem('Målskytt 2','1p/mål',p.malskytt2,ms2Goals),
     `<div class="detail-item"><div class="detail-item-label">Skytteligavinnare <span style="font-weight:400;color:var(--soft)">(2p)</span></div><div class="detail-item-val">${escHtml(p.skytteliga||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
-    `<div class="detail-item"><div class="detail-item-label">Assistspelare <span style="font-weight:400;color:var(--soft)">(1p/assist)</span></div><div class="detail-item-val">${escHtml(p.assist||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
+    msItem('Assistspelare','1p/assist',p.assist,assistGoals,'🎯'),
     `<div class="detail-item"><div class="detail-item-label">Vinnare assistligan <span style="font-weight:400;color:var(--soft)">(2p)</span></div><div class="detail-item-val">${escHtml(p.assistliga||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
     `<div class="detail-item"><div class="detail-item-label">VM-vinnare <span style="font-weight:400;color:var(--soft)">(5p)</span></div><div class="detail-item-val">${escHtml(p.vmvinnare||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
   ].join('');
@@ -594,11 +587,7 @@ function showDetail(name){
     const isDone=actual.length>0||totalPts>0;
     const rows=tips.map(tip=>{
       const pts=p.breakdown?.[`playoff_r${ri}_${tip}`]||0;
-      const showResult=pts>0||isDone;
-      return `<tr style="font-size:11px">
-        <td style="padding:5px 12px;color:${pts>0?'var(--green)':'var(--text)'};font-weight:${pts>0?'700':'400'}">${tip}</td>
-        <td style="padding:5px 12px;text-align:center">${showResult?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${pts>0?'var(--green-mid)':'#fee2e2'};color:${pts>0?'#065f46':'#991b1b'}">${pts>0?'+'+pts+'p':'0p'}</span>`:'<span style="color:var(--soft)">–</span>'}</td>
-      </tr>`;
+      return `<tr style="font-size:11px"><td style="padding:5px 12px;color:${pts>0?'var(--green)':'var(--text)'};font-weight:${pts>0?'700':'400'}">${tip}</td><td style="padding:5px 12px;text-align:center">${pts>0||isDone?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${pts>0?'var(--green-mid)':'#fee2e2'};color:${pts>0?'#065f46':'#991b1b'}">${pts>0?'+'+pts+'p':'0p'}</span>`:'<span style="color:var(--soft)">–</span>'}</td></tr>`;
     }).join('');
     return `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:6px">
       <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);cursor:pointer;font-size:12px;font-weight:600">
@@ -653,13 +642,13 @@ async function loadTipsFromGitHub(){
 }
 async function init(){
   await loadTipsFromGitHub();
-  await loadMatchData();
+  await Promise.all([loadMatchData(), loadAssists()]);
   if(state.players.length&&state.apiOk){
     calcAllScores();
     renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();
   }
   setInterval(async()=>{
-    await loadMatchData();
+    await Promise.all([loadMatchData(), loadAssists()]);
     if(state.players.length&&state.apiOk){
       calcAllScores();
       renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();
