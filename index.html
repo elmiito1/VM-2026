@@ -235,17 +235,17 @@ const PLAYOFF_ROUND_COLS=[{col:203,count:32,name:'32 lag → 16-delsfinal',pts:1
 let state={players:[],matches:[],standings:{},scorers:[],assists:[],matchResults:{},lastFetch:null,apiOk:false};
 function initials(n){return n.replace(/\(.*?\)/g,'').trim().split(/\s+/).map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?';}
 function switchTab(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');const tb=document.querySelector('[data-tab="'+id+'"]');if(tb)tb.classList.add('active');}
-async function fetchAPI(path){try{const r=await fetch(`${API_BASE}${path}`,{headers:{'X-Auth-Token':API_KEY}});if(!r.ok)throw new Error(`HTTP ${r.status}`);return await r.json();}catch(e){console.warn('API:',e);return null;}}
-async function fetchBDL(path){try{const r=await fetch(`${BDL_BASE}${path}`,{headers:{'Authorization':BDL_KEY}});if(!r.ok)throw new Error(`HTTP ${r.status}`);return await r.json();}catch(e){console.warn('BDL:',e);return null;}}
+async function fetchAPI(path){try{const r=await fetch(API_BASE+path,{headers:{'X-Auth-Token':API_KEY}});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}catch(e){console.warn('API:',e);return null;}}
+async function fetchBDL(path){try{const r=await fetch(BDL_BASE+path,{headers:{'Authorization':'Bearer '+BDL_KEY}});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}catch(e){console.warn('BDL:',e);return null;}}
 async function loadAssists(){
   try{
     let all=[],cursor=null;
     do{
-      const url=cursor?`/rosters?seasons[]=2026&per_page=100&cursor=${cursor}`:`/rosters?seasons[]=2026&per_page=100`;
+      const url=cursor?'/rosters?seasons[]=2026&per_page=100&cursor='+cursor:'/rosters?seasons[]=2026&per_page=100';
       const data=await fetchBDL(url);
       if(!data||!data.data)break;
       all=[...all,...data.data];
-      cursor=data.meta?.next_cursor||null;
+      cursor=data.meta&&data.meta.next_cursor?data.meta.next_cursor:null;
     }while(cursor);
     state.assists=all.filter(p=>p.assists>0).sort((a,b)=>b.assists-a.assists);
     console.log('Assists:',state.assists.length,'spelare');
@@ -279,17 +279,17 @@ async function loadMatchData(){
     const BH='Bosnien & Hercegovina';
     const homeVars=[hS,hE,hS.replace(BH,'B&H'),toSwe(m.homeTeam?.name||'')].filter(Boolean);
     const awayVars=[aS,aE,aS.replace(BH,'B&H'),toSwe(m.awayTeam?.name||'')].filter(Boolean);
-    for(const h of[...new Set(homeVars)])for(const a of[...new Set(awayVars)])for(const d of['–','-'])state.matchResults[`${h}${d}${a}`]=res;
+    for(const h of[...new Set(homeVars)])for(const a of[...new Set(awayVars)])for(const d of['–','-'])state.matchResults[h+d+a]=res;
   }
   state.standings=buildStandingsFromMatches(data.matches);
   const scData=await fetchAPI('/competitions/WC/scorers?season=2026&limit=20');
   if(scData?.scorers)state.scorers=scData.scorers;
   state.lastFetch=new Date();
-  document.getElementById('last-update').textContent=`Uppdaterat ${state.lastFetch.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'})}`;
+  document.getElementById('last-update').textContent='Uppdaterat '+state.lastFetch.toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'});
   renderGroups();renderPlayoff();
   const played=data.matches.filter(m=>m.status==='FINISHED').length;
   document.getElementById('m-played').textContent=played;
-  document.getElementById('m-played-sub').textContent=`av ${data.matches.length} spelade`;
+  document.getElementById('m-played-sub').textContent='av '+data.matches.length+' spelade';
 }
 function getActualAdvancers(){
   const rounds=[[],[],[],[],[]];
@@ -339,14 +339,14 @@ function calcAllScores(){
       const placements=p.groupTips?.[gi]||[];
       for(let pos=0;pos<4;pos++){
         const tipped=placements[pos],actual=table[pos]?.team?.shortName||table[pos]?.team?.name||'';
-        if(tipped&&actual&&teamMatch(tipped,actual)){p.total+=1;p.breakdown[`grupp_${groups[gi]}_pos${pos+1}`]=1;}
+        if(tipped&&actual&&teamMatch(tipped,actual)){p.total+=1;p.breakdown['grupp_'+groups[gi]+'_pos'+(pos+1)]=1;}
       }
     }
     for(const field of['malskytt1','malskytt2']){
       const tipped=(p[field]||'').trim();if(!tipped)continue;
       for(const s of state.scorers){
         const pName=s.player?.name||'',goals=s.goals||s.numberOfGoals||0;
-        if(goals>0&&scorerMatch(tipped,pName)){p.total+=goals;p.breakdown[`scorer_${field}`]=(p.breakdown[`scorer_${field}`]||0)+goals;break;}
+        if(goals>0&&scorerMatch(tipped,pName)){p.total+=goals;p.breakdown['scorer_'+field]=(p.breakdown['scorer_'+field]||0)+goals;break;}
       }
     }
     const assistTip=(p.assist||'').trim();
@@ -359,7 +359,7 @@ function calcAllScores(){
     const advancers=getActualAdvancers();
     for(let ri=0;ri<PLAYOFF_ROUND_COLS.length;ri++){
       for(const tip of(p.playoffTips?.[ri]||[])){
-        if(tip&&(advancers[ri]||[]).some(a=>teamMatch(tip,a))){p.total+=1;p.breakdown[`playoff_r${ri}_${tip}`]=1;}
+        if(tip&&(advancers[ri]||[]).some(a=>teamMatch(tip,a))){p.total+=1;p.breakdown['playoff_r'+ri+'_'+tip]=1;}
       }
     }
   }
@@ -374,7 +374,7 @@ function renderMetrics(){
   const ps=state.players.filter(p=>p.vmvinnare||p.malskytt1);if(!ps.length)return;
   const sorted=[...ps].sort((a,b)=>b.total-a.total);
   document.getElementById('m-leader').textContent=sorted[0]?.name.split(' ')[0]||'–';
-  document.getElementById('m-leader-pts').textContent=`${sorted[0]?.total||0} poäng`;
+  document.getElementById('m-leader-pts').textContent=(sorted[0]?.total||0)+' poäng';
   document.getElementById('m-players').textContent=ps.length;
   document.getElementById('m-fav').textContent=getMostPicked(ps,'vmvinnare');
 }
@@ -385,12 +385,12 @@ function renderLeaderboard(){
   const sorted=[...ps].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name)),maxPts=sorted[0]?.total||1;
   document.getElementById('lb-rows').innerHTML=sorted.map((p,i)=>{
     const color=COLORS[i%COLORS.length],medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1),bar=Math.round((p.total/maxPts)*100);
-    return `<div class="${i===0?'lb-row gold':'lb-row'}" onclick="showDetail('${escHtml(p.name).replace(/'/g,"\\'")}')">
-      <div class="rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${medal}</div>
-      <div class="p-wrap"><div class="avatar" style="background:${color}20;color:${color}">${initials(p.name)}</div>
-        <div style="min-width:0;flex:1"><div class="p-name">${escHtml(p.name)}</div>${p.vmvinnare?`<div class="p-vmwinner">🏆 ${p.vmvinnare}</div>`:''}
-          <div class="bar-wrap"><div class="bar-fill" style="width:${bar}%;background:${color}"></div></div></div></div>
-      <div class="pts-total">${p.total}</div><div class="trend-eq">›</div></div>`;
+    return '<div class="'+(i===0?'lb-row gold':'lb-row')+'" onclick="showDetail(\''+escHtml(p.name).replace(/'/g,"\\'")+'\')">'
+      +'<div class="rank '+(i===0?'r1':i===1?'r2':i===2?'r3':'')+'">'+medal+'</div>'
+      +'<div class="p-wrap"><div class="avatar" style="background:'+color+'20;color:'+color+'">'+initials(p.name)+'</div>'
+      +'<div style="min-width:0;flex:1"><div class="p-name">'+escHtml(p.name)+'</div>'+(p.vmvinnare?'<div class="p-vmwinner">🏆 '+p.vmvinnare+'</div>':'')
+      +'<div class="bar-wrap"><div class="bar-fill" style="width:'+bar+'%;background:'+color+'"></div></div></div></div>'
+      +'<div class="pts-total">'+p.total+'</div><div class="trend-eq">›</div></div>';
   }).join('');
 }
 const GROUPS_DEF=[
@@ -414,35 +414,36 @@ function renderGroups(){
       const di=m.indexOf('–'),home=di>=0?m.slice(0,di).trim():m,away=di>=0?m.slice(di+1).trim():'';
       const res=state.matchResults?.[m];
       let s;
-      if(res?.status==='FINISHED'&&res.scoreH!==null)s=`<div class="match-score score-done">${res.scoreH}–${res.scoreA}</div>`;
-      else if(res?.status==='IN_PLAY'||res?.status==='PAUSED')s=`<div class="match-score score-live">🔴 ${res.scoreH??0}–${res.scoreA??0}</div>`;
-      else s=`<div class="match-score score-pending">vs</div>`;
-      return `<div class="match-row"><div class="match-home">${home}</div>${s}<div class="match-away">${away}</div></div>`;
+      if(res?.status==='FINISHED'&&res.scoreH!==null)s='<div class="match-score score-done">'+res.scoreH+'–'+res.scoreA+'</div>';
+      else if(res?.status==='IN_PLAY'||res?.status==='PAUSED')s='<div class="match-score score-live">🔴 '+(res.scoreH??0)+'–'+(res.scoreA??0)+'</div>';
+      else s='<div class="match-score score-pending">vs</div>';
+      return '<div class="match-row"><div class="match-home">'+home+'</div>'+s+'<div class="match-away">'+away+'</div></div>';
     }).join('');
     let standingsHtml='';
     const table=state.standings[g.group];
     if(table&&table.length){
-      standingsHtml=`<div class="group-standings"><div class="standings-head"><div>Lag</div><div>S</div><div>V</div><div>O</div><div>F</div><div>M</div><div>P</div></div>`+
-        table.map((t,i)=>`<div class="${i<2?'standings-row qualified':'standings-row'}">
-          <div style="display:flex;align-items:center;gap:5px;min-width:0"><div class="${i===2?'standings-pos q3':'standings-pos'}">${i+1}</div><div class="standings-name">${toSwe(t.team?.shortName||t.team?.name||'')}</div></div>
-          <div class="standings-num">${t.played??0}</div><div class="standings-num">${t.won??0}</div><div class="standings-num">${t.draw??0}</div><div class="standings-num">${t.lost??0}</div>
-          <div class="standings-num">${t.goalsFor??0}-${t.goalsAgainst??0}</div><div class="standings-pts">${t.points??0}</div></div>`).join('')+'</div>';
+      standingsHtml='<div class="group-standings"><div class="standings-head"><div>Lag</div><div>S</div><div>V</div><div>O</div><div>F</div><div>M</div><div>P</div></div>'+
+        table.map((t,i)=>'<div class="'+(i<2?'standings-row qualified':'standings-row')+'">'
+          +'<div style="display:flex;align-items:center;gap:5px;min-width:0"><div class="'+(i===2?'standings-pos q3':'standings-pos')+'">'+(i+1)+'</div><div class="standings-name">'+toSwe(t.team?.shortName||t.team?.name||'')+'</div></div>'
+          +'<div class="standings-num">'+(t.played??0)+'</div><div class="standings-num">'+(t.won??0)+'</div><div class="standings-num">'+(t.draw??0)+'</div><div class="standings-num">'+(t.lost??0)+'</div>'
+          +'<div class="standings-num">'+(t.goalsFor??0)+'-'+(t.goalsAgainst??0)+'</div><div class="standings-pts">'+(t.points??0)+'</div></div>').join('')+'</div>';
     }
-    return `<div class="group-card"><div class="group-header" style="background:${color}"><span>${g.name}</span><span style="font-size:11px;opacity:.85">${g.teams.length} lag</span></div>
-      <div class="group-teams">${g.teams.map(t=>`<div class="team-chip">${t}</div>`).join('')}</div><div>${matchRows}</div>${standingsHtml}</div>`;
+    return '<div class="group-card"><div class="group-header" style="background:'+color+'"><span>'+g.name+'</span><span style="font-size:11px;opacity:.85">'+g.teams.length+' lag</span></div>'
+      +'<div class="group-teams">'+g.teams.map(t=>'<div class="team-chip">'+t+'</div>').join('')+'</div><div>'+matchRows+'</div>'+standingsHtml+'</div>';
   }).join('');
 }
 function renderPlayoff(){
   if(!state.matches.length){renderPlayoffStatic();return;}
-  const MH=52,GAP=20,MW=140,CONN=24;
-  const unit=MH+GAP;
+  const MH=52,GAP=20,MW=140,CONN=24,unit=MH+GAP;
   function card(m){
-    if(!m)return `<div class="bracket-match" style="opacity:.25"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>`;
+    if(!m)return '<div class="bracket-match" style="opacity:.25"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>';
     const h=m.homeTeam?.shortName||m.homeTeam?.name||'TBD',a=m.awayTeam?.shortName||m.awayTeam?.name||'TBD';
     const sc=m.score?.fullTime,fin=m.status==='FINISHED',live=m.status==='IN_PLAY'||m.status==='PAUSED';
     const hW=fin&&sc?.home>sc?.away,aW=fin&&sc?.away>sc?.home;
     const hS=fin?(sc?.home??''):live?'●':'',aS=fin?(sc?.away??''):live?'●':'';
-    return `<div class="bracket-match"><div class="bracket-team ${hW?'winner':fin?'loser':h==='TBD'?'tbd':''}">${escHtml(toSwe(h))}${hS!==''?`<span class="bracket-score">${hS}</span>`:''}</div><div class="bracket-team ${aW?'winner':fin?'loser':a==='TBD'?'tbd':''}">${escHtml(toSwe(a))}${aS!==''?`<span class="bracket-score">${aS}</span>`:''}</div></div>`;
+    return '<div class="bracket-match">'
+      +'<div class="bracket-team '+(hW?'winner':fin?'loser':h==='TBD'?'tbd':'')+'">'+escHtml(toSwe(h))+(hS!==''?'<span class="bracket-score">'+hS+'</span>':'')+'</div>'
+      +'<div class="bracket-team '+(aW?'winner':fin?'loser':a==='TBD'?'tbd':'')+'">'+escHtml(toSwe(a))+(aS!==''?'<span class="bracket-score">'+aS+'</span>':'')+'</div></div>';
   }
   function fm(t1,t2){return state.matches.find(m=>{const h=m.homeTeam?.shortName||m.homeTeam?.name||'',a=m.awayTeam?.shortName||m.awayTeam?.name||'';return (teamMatch(t1,h)&&teamMatch(t2,a))||(teamMatch(t2,h)&&teamMatch(t1,a));})||null;}
   function winnerOf(m){if(!m||m.status!=='FINISHED')return null;const sc=m.score?.fullTime;if(!sc)return null;if(sc.home>sc.away)return m.homeTeam?.shortName||m.homeTeam?.name;if(sc.away>sc.home)return m.awayTeam?.shortName||m.awayTeam?.name;return null;}
@@ -459,21 +460,21 @@ function renderPlayoff(){
   const FIN=state.matches.find(m=>m.stage==='FINAL')||null,BRO=state.matches.find(m=>m.stage==='THIRD_PLACE')||null;
   function p(level,i){const sp=unit*Math.pow(2,level);return (sp-MH)/2+i*sp;}
   const H=p(0,7)+MH+(MH+GAP)/2,W=MW+CONN;
-  function line(y1,y2,isRight){const lh=y2-y1,mx=isRight?CONN*0.4:CONN*0.6,ex=isRight?CONN:0;return `<svg style="position:absolute;top:${y1}px;left:${isRight?0:MW}px;overflow:visible" width="${CONN}" height="${lh}" xmlns="http://www.w3.org/2000/svg"><line x1="${ex}" y1="0" x2="${mx}" y2="0" stroke="#cbd5e1" stroke-width="1.5"/><line x1="${mx}" y1="0" x2="${mx}" y2="${lh}" stroke="#cbd5e1" stroke-width="1.5"/><line x1="${mx}" y1="${lh}" x2="${ex}" y2="${lh}" stroke="#cbd5e1" stroke-width="1.5"/></svg>`;}
-  function lbl(t){return `<div style="font-size:10px;font-weight:800;color:var(--soft);text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">${t}</div>`;}
-  function buildLeft(){let out='',inner='';for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:0">${card(L[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,false);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;inner='';for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:0">${card(L8[i])}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,false);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;inner='';for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:0">${card(LQ[i])}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,false);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;out+=`<div style="flex-shrink:0;width:${W}px">${lbl('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:0">${card(LS)}</div></div></div>`;return out;}
-  function buildRight(){let out='',inner='';out+=`<div style="flex-shrink:0;width:${W}px">${lbl('SEMI')}<div style="position:relative;height:${H}px"><div style="position:absolute;top:${p(3,0)}px;left:${CONN}px">${card(RS)}</div></div></div>`;inner='';for(let i=0;i<2;i++){inner+=`<div style="position:absolute;top:${p(2,i)}px;left:${CONN}px">${card(RQ[i])}</div>`;if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,true);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('KVART')}<div style="position:relative;height:${H}px">${inner}</div></div>`;inner='';for(let i=0;i<4;i++){inner+=`<div style="position:absolute;top:${p(1,i)}px;left:${CONN}px">${card(R8[i])}</div>`;if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,true);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('8-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;inner='';for(let i=0;i<8;i++){inner+=`<div style="position:absolute;top:${p(0,i)}px;left:${CONN}px">${card(R[i])}</div>`;if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,true);}out+=`<div style="flex-shrink:0;width:${W}px">${lbl('16-DEL')}<div style="position:relative;height:${H}px">${inner}</div></div>`;return out;}
-  const bronze=BRO?`<div style="margin-top:20px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Bronsmatch</div>${card(BRO)}</div>`:'';
-  const finCard=FIN?card(FIN):`<div class="bracket-match"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>`;
-  const finCol=`<div style="flex-shrink:0;width:180px;display:flex;flex-direction:column;align-items:center"><div style="font-size:10px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">⚽ FINAL</div><div style="margin-top:${p(3,0)}px;display:flex;flex-direction:column;align-items:center;gap:12px">${finCard}<div style="font-size:32px;line-height:1">🏆</div>${bronze}</div></div>`;
-  document.getElementById('playoff-content').innerHTML=`<div class="bracket-wrapper">${buildLeft()}${finCol}${buildRight()}</div>`;
+  function line(y1,y2,isRight){const lh=y2-y1,mx=isRight?CONN*0.4:CONN*0.6,ex=isRight?CONN:0;return '<svg style="position:absolute;top:'+y1+'px;left:'+(isRight?0:MW)+'px;overflow:visible" width="'+CONN+'" height="'+lh+'" xmlns="http://www.w3.org/2000/svg"><line x1="'+ex+'" y1="0" x2="'+mx+'" y2="0" stroke="#cbd5e1" stroke-width="1.5"/><line x1="'+mx+'" y1="0" x2="'+mx+'" y2="'+lh+'" stroke="#cbd5e1" stroke-width="1.5"/><line x1="'+mx+'" y1="'+lh+'" x2="'+ex+'" y2="'+lh+'" stroke="#cbd5e1" stroke-width="1.5"/></svg>';}
+  function lbl(t){return '<div style="font-size:10px;font-weight:800;color:var(--soft);text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">'+t+'</div>';}
+  function buildLeft(){let out='',inner='';for(let i=0;i<8;i++){inner+='<div style="position:absolute;top:'+p(0,i)+'px;left:0">'+card(L[i])+'</div>';if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,false);}out+='<div style="flex-shrink:0;width:'+W+'px">'+lbl('16-DEL')+'<div style="position:relative;height:'+H+'px">'+inner+'</div></div>';inner='';for(let i=0;i<4;i++){inner+='<div style="position:absolute;top:'+p(1,i)+'px;left:0">'+card(L8[i])+'</div>';if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,false);}out+='<div style="flex-shrink:0;width:'+W+'px">'+lbl('8-DEL')+'<div style="position:relative;height:'+H+'px">'+inner+'</div></div>';inner='';for(let i=0;i<2;i++){inner+='<div style="position:absolute;top:'+p(2,i)+'px;left:0">'+card(LQ[i])+'</div>';if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,false);}out+='<div style="flex-shrink:0;width:'+W+'px">'+lbl('KVART')+'<div style="position:relative;height:'+H+'px">'+inner+'</div></div>';out+='<div style="flex-shrink:0;width:'+W+'px">'+lbl('SEMI')+'<div style="position:relative;height:'+H+'px"><div style="position:absolute;top:'+p(3,0)+'px;left:0">'+card(LS)+'</div></div></div>';return out;}
+  function buildRight(){let out='',inner='';out+='<div style="flex-shrink:0;width:'+W+'px">'+lbl('SEMI')+'<div style="position:relative;height:'+H+'px"><div style="position:absolute;top:'+p(3,0)+'px;left:'+CONN+'px">'+card(RS)+'</div></div></div>';inner='';for(let i=0;i<2;i++){inner+='<div style="position:absolute;top:'+p(2,i)+'px;left:'+CONN+'px">'+card(RQ[i])+'</div>';if(i===0)inner+=line(p(2,0)+MH/2,p(2,1)+MH/2,true);}out+='<div style="flex-shrink:0;width:'+W+'px">'+lbl('KVART')+'<div style="position:relative;height:'+H+'px">'+inner+'</div></div>';inner='';for(let i=0;i<4;i++){inner+='<div style="position:absolute;top:'+p(1,i)+'px;left:'+CONN+'px">'+card(R8[i])+'</div>';if(i%2===0)inner+=line(p(1,i)+MH/2,p(1,i+1)+MH/2,true);}out+='<div style="flex-shrink:0;width:'+W+'px">'+lbl('8-DEL')+'<div style="position:relative;height:'+H+'px">'+inner+'</div></div>';inner='';for(let i=0;i<8;i++){inner+='<div style="position:absolute;top:'+p(0,i)+'px;left:'+CONN+'px">'+card(R[i])+'</div>';if(i%2===0)inner+=line(p(0,i)+MH/2,p(0,i+1)+MH/2,true);}out+='<div style="flex-shrink:0;width:'+W+'px">'+lbl('16-DEL')+'<div style="position:relative;height:'+H+'px">'+inner+'</div></div>';return out;}
+  const bronze=BRO?'<div style="margin-top:20px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Bronsmatch</div>'+card(BRO)+'</div>':'';
+  const finCard=FIN?card(FIN):'<div class="bracket-match"><div class="bracket-team tbd">TBD</div><div class="bracket-team tbd">TBD</div></div>';
+  const finCol='<div style="flex-shrink:0;width:180px;display:flex;flex-direction:column;align-items:center"><div style="font-size:10px;font-weight:800;color:#f59e0b;text-transform:uppercase;letter-spacing:.8px;text-align:center;padding:8px 0 14px">⚽ FINAL</div><div style="margin-top:'+p(3,0)+'px;display:flex;flex-direction:column;align-items:center;gap:12px">'+finCard+'<div style="font-size:32px;line-height:1">🏆</div>'+bronze+'</div></div>';
+  document.getElementById('playoff-content').innerHTML='<div class="bracket-wrapper">'+buildLeft()+finCol+buildRight()+'</div>';
 }
 function renderPlayoffStatic(){document.getElementById('playoff-content').innerHTML='<div class="empty" style="padding:3rem"><div class="empty-icon">🏆</div>Slutspelet börjar när gruppspelet är klart</div>';}
 function renderScorerTips(field,title){
   const counts={};for(const p of state.players){const v=(p[field]||'').trim();if(v){if(!counts[v])counts[v]=[];counts[v].push(p.name.split(' ')[0]);}}
   if(!Object.keys(counts).length)return '';
-  return `<div style="margin-top:1.5rem"><div class="section-label">${title}</div><div class="lb"><table class="scorer-table"><thead><tr><th>Spelare</th><th>Tippades av</th></tr></thead><tbody>`+
-    Object.entries(counts).sort((a,b)=>b[1].length-a[1].length).map(([n,t])=>`<tr><td class="scorer-name">${n}</td><td><div class="tippers-chips">${t.map(x=>`<span class="tipper-chip">${x}</span>`).join('')}</div></td></tr>`).join('')+'</tbody></table></div></div>';
+  return '<div style="margin-top:1.5rem"><div class="section-label">'+title+'</div><div class="lb"><table class="scorer-table"><thead><tr><th>Spelare</th><th>Tippades av</th></tr></thead><tbody>'+
+    Object.entries(counts).sort((a,b)=>b[1].length-a[1].length).map(([n,t])=>'<tr><td class="scorer-name">'+n+'</td><td><div class="tippers-chips">'+t.map(x=>'<span class="tipper-chip">'+x+'</span>').join('')+'</div></td></tr>').join('')+'</tbody></table></div></div>';
 }
 function renderScorers(){
   const el=document.getElementById('scorers-content');
@@ -482,13 +483,13 @@ function renderScorers(){
   for(const p of state.players)for(const f of['malskytt1','malskytt2']){const n=(p[f]||'').trim().toLowerCase();if(n){if(!tippers[n])tippers[n]=[];tippers[n].push(p.name);}}
   const tipperPts={};
   for(const p of state.players){const pts=(p.breakdown?.['scorer_malskytt1']||0)+(p.breakdown?.['scorer_malskytt2']||0);if(pts>0)tipperPts[p.name]=pts;}
-  el.innerHTML=`<table class="scorer-table"><thead><tr><th>#</th><th>Spelare</th><th style="text-align:center">Mål</th></tr></thead><tbody>`+
+  el.innerHTML='<table class="scorer-table"><thead><tr><th>#</th><th>Spelare</th><th style="text-align:center">Mål</th></tr></thead><tbody>'+
     state.scorers.map((s,i)=>{
       const pName=s.player?.name||'?',team=toSwe(s.team?.shortName||s.team?.name||''),goals=s.goals||0;
       const mt=Object.entries(tippers).filter(([n])=>pName.toLowerCase().includes(n)||n.includes(pName.toLowerCase().split(' ')[0])).flatMap(([,t])=>t);
       const uniqueTippers=[...new Set(mt)];
-      const tipperChips=uniqueTippers.map(t=>{const pts=tipperPts[t]||0;return `<span class="tipper-chip" style="${pts>0?'background:var(--green-mid);color:#065f46':''}">${t.split(' ')[0]}${pts>0?` +${pts}p`:''}</span>`;}).join('');
-      return `<tr><td class="scorer-rank">${i+1}</td><td><div class="scorer-name">${pName}</div><div class="scorer-team">${team}</div>${uniqueTippers.length?`<div class="tippers-chips">${tipperChips}</div>`:''}</td><td class="scorer-goals">${goals}</td></tr>`;
+      const tipperChips=uniqueTippers.map(t=>{const pts=tipperPts[t]||0;return '<span class="tipper-chip" style="'+(pts>0?'background:var(--green-mid);color:#065f46':'')+'">'+t.split(' ')[0]+(pts>0?' +'+pts+'p':'')+'</span>';}).join('');
+      return '<tr><td class="scorer-rank">'+(i+1)+'</td><td><div class="scorer-name">'+pName+'</div><div class="scorer-team">'+team+'</div>'+(uniqueTippers.length?'<div class="tippers-chips">'+tipperChips+'</div>':'')+'</td><td class="scorer-goals">'+goals+'</td></tr>';
     }).join('')+'</tbody></table>';
   if(state.players.length)el.innerHTML+=renderScorerTips('skytteliga','Skytteligavinnare-tips');
 }
@@ -503,13 +504,13 @@ function renderAssists(){
   for(const p of state.players){const n=(p.assist||'').trim().toLowerCase();if(n){if(!tippers[n])tippers[n]=[];tippers[n].push(p.name);}}
   const tipperPts={};
   for(const p of state.players){const pts=p.breakdown?.['assist_player']||0;if(pts>0)tipperPts[p.name]=pts;}
-  el.innerHTML=`<table class="scorer-table"><thead><tr><th>#</th><th>Spelare</th><th style="text-align:center">Assist</th></tr></thead><tbody>`+
+  el.innerHTML='<table class="scorer-table"><thead><tr><th>#</th><th>Spelare</th><th style="text-align:center">Assist</th></tr></thead><tbody>'+
     state.assists.slice(0,20).map((s,i)=>{
       const pName=s.player?.name||'?',country=s.player?.country_name||'',assists=s.assists||0;
       const mt=Object.entries(tippers).filter(([n])=>pName.toLowerCase().includes(n)||n.includes(pName.toLowerCase().split(' ').pop())).flatMap(([,t])=>t);
       const uniqueTippers=[...new Set(mt)];
-      const tipperChips=uniqueTippers.map(t=>{const pts=tipperPts[t]||0;return `<span class="tipper-chip" style="${pts>0?'background:var(--green-mid);color:#065f46':''}">${t.split(' ')[0]}${pts>0?` +${pts}p`:''}</span>`;}).join('');
-      return `<tr><td class="scorer-rank">${i+1}</td><td><div class="scorer-name">${pName}</div><div class="scorer-team">${country}</div>${uniqueTippers.length?`<div class="tippers-chips">${tipperChips}</div>`:''}</td><td class="scorer-goals">${assists}</td></tr>`;
+      const tipperChips=uniqueTippers.map(t=>{const pts=tipperPts[t]||0;return '<span class="tipper-chip" style="'+(pts>0?'background:var(--green-mid);color:#065f46':'')+'">'+t.split(' ')[0]+(pts>0?' +'+pts+'p':'')+'</span>';}).join('');
+      return '<tr><td class="scorer-rank">'+(i+1)+'</td><td><div class="scorer-name">'+pName+'</div><div class="scorer-team">'+country+'</div>'+(uniqueTippers.length?'<div class="tippers-chips">'+tipperChips+'</div>':'')+'</td><td class="scorer-goals">'+assists+'</td></tr>';
     }).join('')+'</tbody></table>';
   if(state.players.length)el.innerHTML+=renderScorerTips('assistliga','Assistligavinnare-tips');
 }
@@ -520,16 +521,16 @@ function renderPlayoffTips(){
   let html='<div class="section-label" style="margin-bottom:12px">Grupplaceringstips</div><div class="groups-grid">';
   for(let gi=0;gi<groups.length;gi++){
     const table=state.standings['GROUP_'+groups[gi]]||[],color=COLORS[gi%COLORS.length];
-    html+=`<div class="group-card"><div class="group-header" style="background:${color}">Grupp ${groups[gi]}</div>`+
+    html+='<div class="group-card"><div class="group-header" style="background:'+color+'">Grupp '+groups[gi]+'</div>'+
       ['1:a','2:a','3:a','4:a'].map((pos,pi)=>{
         const at=table[pi]?.team?.shortName||table[pi]?.team?.name||'',as=at?toSwe(at):'Ej spelat';
         const tipMap={};for(const p of state.players){const tip=(p.groupTips?.[gi]?.[pi]||'').trim();if(!tip)continue;if(!tipMap[tip])tipMap[tip]=[];tipMap[tip].push(p.name.split(' ')[0]);}
         const chips=Object.entries(tipMap).sort((a,b)=>b[1].length-a[1].length).map(([tip,players])=>{
           const ok=at&&teamMatch(tip,at),bad=at&&!ok;
           const bg=ok?'background:var(--green-mid);color:#065f46':bad?'background:#fee2e2;color:#991b1b':'background:var(--bg);color:var(--mid)';
-          return `<div style="display:flex;align-items:center;gap:5px;padding:3px 0"><span style="font-size:11px;font-weight:600;min-width:80px;${bg.split(';')[0]};padding:1px 7px;border-radius:10px;${bg.split(';')[1]}">${tip}</span><span style="font-size:10px;color:var(--soft)">${players.join(', ')}</span></div>`;
+          return '<div style="display:flex;align-items:center;gap:5px;padding:3px 0"><span style="font-size:11px;font-weight:600;min-width:80px;'+bg.split(';')[0]+';padding:1px 7px;border-radius:10px;'+bg.split(';')[1]+'">'+tip+'</span><span style="font-size:10px;color:var(--soft)">'+players.join(', ')+'</span></div>';
         }).join('');
-        return `<div style="padding:7px 14px;border-top:1px solid var(--border);font-size:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><span style="color:var(--soft);font-weight:600">${pos}</span><span style="font-size:11px;font-weight:600;color:${at?'var(--green)':'var(--soft)'}">${as}</span></div>${chips||'<span style="color:var(--soft);font-size:10px">Inga tips</span>'}</div>`;
+        return '<div style="padding:7px 14px;border-top:1px solid var(--border);font-size:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><span style="color:var(--soft);font-weight:600">'+pos+'</span><span style="font-size:11px;font-weight:600;color:'+(at?'var(--green)':'var(--soft)')+'">'+as+'</span></div>'+(chips||'<span style="color:var(--soft);font-size:10px">Inga tips</span>')+'</div>';
       }).join('')+'</div>';
   }
   html+='</div><div class="section-label" style="margin:1.5rem 0 12px">Slutspelslagstips</div>';
@@ -537,8 +538,8 @@ function renderPlayoffTips(){
   for(let ri=0;ri<PLAYOFF_ROUND_COLS.length;ri++){
     const round=PLAYOFF_ROUND_COLS[ri],actual=advancers[ri]||[],tc={};
     for(const p of state.players)for(const tip of(p.playoffTips?.[ri]||[])){if(!tip)continue;const k=tip.trim();if(!tc[k])tc[k]={tip:k,players:[],correct:null};tc[k].players.push(p.name.split(' ')[0]);if(actual.length)tc[k].correct=actual.some(a=>teamMatch(k,a));}
-    const cards=Object.values(tc).sort((a,b)=>b.players.length-a.players.length).map(t=>`<div class="playoff-tip-card"><div class="playoff-tip-team ${t.correct===true?'correct':t.correct===false?'wrong':'pending'}">${t.tip} <span style="font-size:10px;color:var(--soft)">${t.players.length}×</span></div><div class="playoff-tip-tippers">${t.players.join(', ')}</div></div>`).join('');
-    html+=`<div class="playoff-tips-round"><div class="playoff-tips-title"><span>${round.name}</span><span style="font-size:11px;opacity:.8">${round.pts}p/rätt</span></div><div class="playoff-tips-grid">${cards||'<div style="color:var(--soft);font-size:13px">Inga tips ännu</div>'}</div></div>`;
+    const cards=Object.values(tc).sort((a,b)=>b.players.length-a.players.length).map(t=>'<div class="playoff-tip-card"><div class="playoff-tip-team '+(t.correct===true?'correct':t.correct===false?'wrong':'pending')+'">'+t.tip+' <span style="font-size:10px;color:var(--soft)">'+t.players.length+'×</span></div><div class="playoff-tip-tippers">'+t.players.join(', ')+'</div></div>').join('');
+    html+='<div class="playoff-tips-round"><div class="playoff-tips-title"><span>'+round.name+'</span><span style="font-size:11px;opacity:.8">'+round.pts+'p/rätt</span></div><div class="playoff-tips-grid">'+(cards||'<div style="color:var(--soft);font-size:13px">Inga tips ännu</div>')+'</div></div>';
   }
   el.innerHTML=html;
 }
@@ -549,63 +550,65 @@ function showDetail(name){
   const ms1Goals=(()=>{const t=(p.malskytt1||'').trim();if(!t||!state.scorers.length)return null;const s=state.scorers.find(s=>scorerMatch(t,s.player?.name||''));return s?s.goals||0:null;})();
   const ms2Goals=(()=>{const t=(p.malskytt2||'').trim();if(!t||!state.scorers.length)return null;const s=state.scorers.find(s=>scorerMatch(t,s.player?.name||''));return s?s.goals||0:null;})();
   const assistGoals=(()=>{const t=(p.assist||'').trim();if(!t||!state.assists.length)return null;const s=state.assists.find(s=>assistMatch(t,s.player?.name||''));return s?s.assists||0:null;})();
-  function msItem(label,pts,val,goals,unit='⚽'){return `<div class="detail-item"><div class="detail-item-label">${label} <span style="font-weight:400;color:var(--soft)">(${pts})</span></div><div class="detail-item-val">${escHtml(val||'')||'<span style="color:var(--soft)">–</span>'}${goals!==null?`<span style="color:var(--green);font-size:11px;margin-left:6px">${goals}${unit} = ${goals}p</span>`:''}</div></div>`;}
+  function msItem(label,pts,val,goals,unit){unit=unit||'⚽';return '<div class="detail-item"><div class="detail-item-label">'+label+' <span style="font-weight:400;color:var(--soft)">('+pts+')</span></div><div class="detail-item-val">'+(escHtml(val||'')||'<span style="color:var(--soft)">–</span>')+(goals!==null?'<span style="color:var(--green);font-size:11px;margin-left:6px">'+goals+unit+' = '+goals+'p</span>':'')+'</div></div>';}
   const indivRows=[
-    msItem('Målskytt 1','1p/mål',p.malskytt1,ms1Goals),
-    msItem('Målskytt 2','1p/mål',p.malskytt2,ms2Goals),
-    `<div class="detail-item"><div class="detail-item-label">Skytteligavinnare <span style="font-weight:400;color:var(--soft)">(2p)</span></div><div class="detail-item-val">${escHtml(p.skytteliga||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
+    msItem('Målskytt 1','1p/mål',p.malskytt1,ms1Goals,'⚽'),
+    msItem('Målskytt 2','1p/mål',p.malskytt2,ms2Goals,'⚽'),
+    '<div class="detail-item"><div class="detail-item-label">Skytteligavinnare <span style="font-weight:400;color:var(--soft)">(2p)</span></div><div class="detail-item-val">'+(escHtml(p.skytteliga||'')||'<span style="color:var(--soft)">–</span>')+'</div></div>',
     msItem('Assistspelare','1p/assist',p.assist,assistGoals,'🎯'),
-    `<div class="detail-item"><div class="detail-item-label">Vinnare assistligan <span style="font-weight:400;color:var(--soft)">(2p)</span></div><div class="detail-item-val">${escHtml(p.assistliga||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
-    `<div class="detail-item"><div class="detail-item-label">VM-vinnare <span style="font-weight:400;color:var(--soft)">(5p)</span></div><div class="detail-item-val">${escHtml(p.vmvinnare||'')||'<span style="color:var(--soft)">–</span>'}</div></div>`,
+    '<div class="detail-item"><div class="detail-item-label">Vinnare assistligan <span style="font-weight:400;color:var(--soft)">(2p)</span></div><div class="detail-item-val">'+(escHtml(p.assistliga||'')||'<span style="color:var(--soft)">–</span>')+'</div></div>',
+    '<div class="detail-item"><div class="detail-item-label">VM-vinnare <span style="font-weight:400;color:var(--soft)">(5p)</span></div><div class="detail-item-val">'+(escHtml(p.vmvinnare||'')||'<span style="color:var(--soft)">–</span>')+'</div></div>',
   ].join('');
   const groups=['A','B','C','D','E','F','G','H','I','J','K','L'];
   const groupRows=groups.map((g,gi)=>{
     const table=state.standings['GROUP_'+g]||[],placements=p.groupTips?.[gi]||[];
-    const totalPts=[1,2,3,4].reduce((s,pos)=>s+(p.breakdown?.[`grupp_${g}_pos${pos}`]||0),0);
+    const totalPts=[1,2,3,4].reduce((s,pos)=>s+(p.breakdown?.['grupp_'+g+'_pos'+pos]||0),0);
     const isDone=table.length>0&&table.some(t=>t.played>0);
     const posRows=[1,2,3,4].map(pos=>{
       const actual=table[pos-1]?.team?.shortName||table[pos-1]?.team?.name||'',actualSwe=actual?toSwe(actual):'',tipped=(placements[pos-1]||'').trim();
       const correct=actualSwe&&tipped&&teamMatch(tipped,actualSwe);
-      return `<tr style="font-size:11px"><td style="padding:5px 12px;color:var(--soft);font-weight:600">${pos}</td><td style="padding:5px 12px;color:${actualSwe?'var(--text)':'var(--soft)'}">${actualSwe||'–'}</td><td style="padding:5px 12px;color:${tipped?'var(--text)':'var(--soft)'}">${tipped||'–'}</td><td style="padding:5px 12px;text-align:center">${isDone&&tipped?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${correct?'var(--green-mid)':'#fee2e2'};color:${correct?'#065f46':'#991b1b'}">${correct?'+1p':'0p'}</span>`:'<span style="color:var(--soft)">–</span>'}</td></tr>`;
+      return '<tr style="font-size:11px"><td style="padding:5px 12px;color:var(--soft);font-weight:600">'+pos+'</td><td style="padding:5px 12px;color:'+(actualSwe?'var(--text)':'var(--soft)')+'">'+( actualSwe||'–')+'</td><td style="padding:5px 12px;color:'+(tipped?'var(--text)':'var(--soft)')+'">'+( tipped||'–')+'</td><td style="padding:5px 12px;text-align:center">'+(isDone&&tipped?'<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:'+(correct?'var(--green-mid)':'#fee2e2')+';color:'+(correct?'#065f46':'#991b1b')+'">'+(correct?'+1p':'0p')+'</span>':'<span style="color:var(--soft)">–</span>')+'</td></tr>';
     }).join('');
-    return `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:6px">
-      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);cursor:pointer;font-size:12px;font-weight:600">
-        <span>Grupp ${g}</span><span style="display:flex;align-items:center;gap:8px">${totalPts>0?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--green-mid);color:#065f46">+${totalPts}p</span>`:''}${!isDone?'<span style="font-size:10px;color:var(--soft)">Ej klar</span>':''}<span style="color:var(--soft)">▾</span></span></div>
-      <div style="display:none"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--bg);font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase"><th style="padding:5px 12px;text-align:left">#</th><th style="padding:5px 12px;text-align:left">Facit</th><th style="padding:5px 12px;text-align:left">Ditt tips</th><th style="padding:5px 12px;text-align:center">Poäng</th></tr></thead><tbody>${posRows}</tbody></table></div></div>`;
+    return '<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:6px">'
+      +'<div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);cursor:pointer;font-size:12px;font-weight:600">'
+      +'<span>Grupp '+g+'</span><span style="display:flex;align-items:center;gap:8px">'+(totalPts>0?'<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--green-mid);color:#065f46">+'+totalPts+'p</span>':'')
+      +(!isDone?'<span style="font-size:10px;color:var(--soft)">Ej klar</span>':'')+'<span style="color:var(--soft)">▾</span></span></div>'
+      +'<div style="display:none"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--bg);font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase"><th style="padding:5px 12px;text-align:left">#</th><th style="padding:5px 12px;text-align:left">Facit</th><th style="padding:5px 12px;text-align:left">Ditt tips</th><th style="padding:5px 12px;text-align:center">Poäng</th></tr></thead><tbody>'+posRows+'</tbody></table></div></div>';
   }).join('');
   const advancers=getActualAdvancers();
   const roundNames=['16-delsfinal','Åttondelsfinaler','Kvartsfinaler','Semifinaler','Final'];
   const playoffRows=PLAYOFF_ROUND_COLS.map((round,ri)=>{
     const tips=p.playoffTips?.[ri]||[];if(!tips.length)return '';
     const actual=advancers[ri]||[];
-    const totalPts=tips.reduce((s,tip)=>s+(p.breakdown?.[`playoff_r${ri}_${tip}`]||0),0);
+    const totalPts=tips.reduce((s,tip)=>s+(p.breakdown?.['playoff_r'+ri+'_'+tip]||0),0);
     const isDone=actual.length>0||totalPts>0;
     const rows=tips.map(tip=>{
-      const pts=p.breakdown?.[`playoff_r${ri}_${tip}`]||0;
-      return `<tr style="font-size:11px"><td style="padding:5px 12px;color:${pts>0?'var(--green)':'var(--text)'};font-weight:${pts>0?'700':'400'}">${tip}</td><td style="padding:5px 12px;text-align:center">${pts>0||isDone?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${pts>0?'var(--green-mid)':'#fee2e2'};color:${pts>0?'#065f46':'#991b1b'}">${pts>0?'+'+pts+'p':'0p'}</span>`:'<span style="color:var(--soft)">–</span>'}</td></tr>`;
+      const pts=p.breakdown?.['playoff_r'+ri+'_'+tip]||0;
+      return '<tr style="font-size:11px"><td style="padding:5px 12px;color:'+(pts>0?'var(--green)':'var(--text)')+';font-weight:'+(pts>0?'700':'400')+'">'+tip+'</td><td style="padding:5px 12px;text-align:center">'+(pts>0||isDone?'<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:'+(pts>0?'var(--green-mid)':'#fee2e2')+';color:'+(pts>0?'#065f46':'#991b1b')+'">'+(pts>0?'+'+pts+'p':'0p')+'</span>':'<span style="color:var(--soft)">–</span>')+'</td></tr>';
     }).join('');
-    return `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:6px">
-      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);cursor:pointer;font-size:12px;font-weight:600">
-        <span>${roundNames[ri]}</span><span style="display:flex;align-items:center;gap:8px">${totalPts>0?`<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--green-mid);color:#065f46">+${totalPts}p</span>`:''}${!isDone?'<span style="font-size:10px;color:var(--soft)">Ej spelat</span>':''}<span style="color:var(--soft)">▾</span></span></div>
-      <div style="display:none"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--bg);font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase"><th style="padding:5px 12px;text-align:left">Lag</th><th style="padding:5px 12px;text-align:center">Poäng</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    return '<div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:6px">'
+      +'<div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);cursor:pointer;font-size:12px;font-weight:600">'
+      +'<span>'+roundNames[ri]+'</span><span style="display:flex;align-items:center;gap:8px">'+(totalPts>0?'<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--green-mid);color:#065f46">+'+totalPts+'p</span>':'')
+      +(!isDone?'<span style="font-size:10px;color:var(--soft)">Ej spelat</span>':'')+'<span style="color:var(--soft)">▾</span></span></div>'
+      +'<div style="display:none"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--bg);font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase"><th style="padding:5px 12px;text-align:left">Lag</th><th style="padding:5px 12px;text-align:center">Poäng</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
   }).filter(Boolean).join('');
   const matchRows=Object.entries(p.matchTips).map(([match,tip])=>{
     const res=state.matchResults?.[match],fin=res?.status==='FINISHED',pts=p.breakdown?.[match]||0;
-    return `<tr><td>${match}${fin?(pts>0?`<span class="pts-badge pts-green">+${pts}p</span>`:`<span class="pts-badge pts-red">0p</span>`):''}</td><td class="tip-${fin?(pts>=3?'correct':'wrong'):'pending'}">${formatScore(tip.res)}</td><td>${(tip.sign||'').trim().toUpperCase()||'–'}</td><td style="color:var(--soft);font-size:11px">${fin&&res.scoreH!==null?`${res.scoreH}–${res.scoreA}`:''}</td></tr>`;
+    return '<tr><td>'+match+(fin?(pts>0?'<span class="pts-badge pts-green">+'+pts+'p</span>':'<span class="pts-badge pts-red">0p</span>'):'')+'</td><td class="tip-'+(fin?(pts>=3?'correct':'wrong'):'pending')+'">'+formatScore(tip.res)+'</td><td>'+((tip.sign||'').trim().toUpperCase()||'–')+'</td><td style="color:var(--soft);font-size:11px">'+(fin&&res.scoreH!==null?res.scoreH+'–'+res.scoreA:'')+'</td></tr>';
   }).join('');
-  document.getElementById('detail-content').innerHTML=`
-    <div class="detail-card"><div class="detail-header"><div class="detail-avatar" style="background:${color}20;color:${color}">${initials(p.name)}</div><div><div class="detail-name">${escHtml(p.name)}</div><div class="detail-pts">${p.total} poäng totalt</div></div></div><div class="detail-grid">${indivRows}</div></div>
-    <div class="section-label" style="margin-top:1rem">Grupplaceringar</div><div style="margin-bottom:1rem">${groupRows}</div>
-    ${playoffRows?`<div class="section-label" style="margin-top:1rem">Slutspelstips</div><div style="margin-bottom:1rem">${playoffRows}</div>`:''}
-    ${matchRows?`<div class="section-label" style="margin-top:1rem">Mattips</div><div class="lb" style="overflow-x:auto"><table class="tips-table"><thead><tr><th>Match</th><th>Tips</th><th>Tecken</th><th>Facit</th></tr></thead><tbody>${matchRows}</tbody></table></div>`:''}`;
+  document.getElementById('detail-content').innerHTML=
+    '<div class="detail-card"><div class="detail-header"><div class="detail-avatar" style="background:'+color+'20;color:'+color+'">'+initials(p.name)+'</div><div><div class="detail-name">'+escHtml(p.name)+'</div><div class="detail-pts">'+p.total+' poäng totalt</div></div></div><div class="detail-grid">'+indivRows+'</div></div>'
+    +'<div class="section-label" style="margin-top:1rem">Grupplaceringar</div><div style="margin-bottom:1rem">'+groupRows+'</div>'
+    +(playoffRows?'<div class="section-label" style="margin-top:1rem">Slutspelstips</div><div style="margin-bottom:1rem">'+playoffRows+'</div>':'')
+    +(matchRows?'<div class="section-label" style="margin-top:1rem">Mattips</div><div class="lb" style="overflow-x:auto"><table class="tips-table"><thead><tr><th>Match</th><th>Tips</th><th>Tecken</th><th>Facit</th></tr></thead><tbody>'+matchRows+'</tbody></table></div>':'');
   switchTab('detail');
 }
 function renderTips(){
   const ps=state.players.filter(p=>p.vmvinnare||p.malskytt1);if(!ps.length)return;
   document.getElementById('tips-content').innerHTML=[...ps].sort((a,b)=>b.total-a.total).map((p,i)=>{
     const color=COLORS[i%COLORS.length];
-    return `<div class="lb" style="margin-bottom:10px;overflow:hidden"><div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border)"><div class="avatar" style="background:${color}20;color:${color};width:26px;height:26px;font-size:10px">${initials(p.name)}</div><span style="font-weight:700;font-size:13px">${escHtml(p.name)}</span><span style="font-size:12px;color:var(--soft);margin-left:auto">${p.total}p</span></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));padding:10px 14px;gap:8px;font-size:12px"><div><span style="color:var(--soft)">VM-vinnare:</span> <strong>${escHtml(p.vmvinnare)||'–'}</strong></div><div><span style="color:var(--soft)">Skytteliga:</span> <strong>${escHtml(p.skytteliga)||'–'}</strong></div><div><span style="color:var(--soft)">Målskytt 1:</span> <strong>${escHtml(p.malskytt1)||'–'}</strong></div><div><span style="color:var(--soft)">Målskytt 2:</span> <strong>${escHtml(p.malskytt2)||'–'}</strong></div><div><span style="color:var(--soft)">Assistspelare:</span> <strong>${escHtml(p.assist)||'–'}</strong></div><div><span style="color:var(--soft)">Assistliga:</span> <strong>${escHtml(p.assistliga)||'–'}</strong></div></div></div>`;
+    return '<div class="lb" style="margin-bottom:10px;overflow:hidden"><div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border)"><div class="avatar" style="background:'+color+'20;color:'+color+';width:26px;height:26px;font-size:10px">'+initials(p.name)+'</div><span style="font-weight:700;font-size:13px">'+escHtml(p.name)+'</span><span style="font-size:12px;color:var(--soft);margin-left:auto">'+p.total+'p</span></div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));padding:10px 14px;gap:8px;font-size:12px"><div><span style="color:var(--soft)">VM-vinnare:</span> <strong>'+(escHtml(p.vmvinnare)||'–')+'</strong></div><div><span style="color:var(--soft)">Skytteliga:</span> <strong>'+(escHtml(p.skytteliga)||'–')+'</strong></div><div><span style="color:var(--soft)">Målskytt 1:</span> <strong>'+(escHtml(p.malskytt1)||'–')+'</strong></div><div><span style="color:var(--soft)">Målskytt 2:</span> <strong>'+(escHtml(p.malskytt2)||'–')+'</strong></div><div><span style="color:var(--soft)">Assistspelare:</span> <strong>'+(escHtml(p.assist)||'–')+'</strong></div><div><span style="color:var(--soft)">Assistliga:</span> <strong>'+(escHtml(p.assistliga)||'–')+'</strong></div></div></div>';
   }).join('');
 }
 function cellToScore(val){if(val===null||val===undefined||val==='')return '';return String(val).trim();}
@@ -629,11 +632,11 @@ function parseExcelPlayers(raw){
 function handleFile(input){
   const file=input.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array',cellDates:false,raw:true});const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:true});state.players=parseExcelPlayers(raw);if(state.apiOk)calcAllScores();document.getElementById('header-sub').textContent=`${state.players.filter(p=>p.vmvinnare||p.malskytt1).length} deltagare · VM 2026`;renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();switchTab('leaderboard');}catch(err){alert('Kunde inte läsa filen: '+err.message);}};
+  reader.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array',cellDates:false,raw:true});const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:true});state.players=parseExcelPlayers(raw);if(state.apiOk)calcAllScores();document.getElementById('header-sub').textContent=state.players.filter(p=>p.vmvinnare||p.malskytt1).length+' deltagare · VM 2026';renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();switchTab('leaderboard');}catch(err){alert('Kunde inte läsa filen: '+err.message);}};
   reader.readAsArrayBuffer(file);input.value='';
 }
 async function loadTipsFromGitHub(){
-  try{const r=await fetch('tips.xlsx');if(!r.ok)return;const wb=XLSX.read(await r.arrayBuffer(),{type:'array',cellDates:false,raw:true});const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:true});state.players=parseExcelPlayers(raw);document.getElementById('header-sub').textContent=`${state.players.filter(p=>p.vmvinnare||p.malskytt1).length} deltagare · VM 2026`;renderLeaderboard();renderMetrics();renderTips();console.log('Tips laddade:',state.players.length);}catch(e){console.log('Ingen tips.xlsx:',e);}
+  try{const r=await fetch('tips.xlsx');if(!r.ok)return;const wb=XLSX.read(await r.arrayBuffer(),{type:'array',cellDates:false,raw:true});const raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:'',raw:true});state.players=parseExcelPlayers(raw);document.getElementById('header-sub').textContent=state.players.filter(p=>p.vmvinnare||p.malskytt1).length+' deltagare · VM 2026';renderLeaderboard();renderMetrics();renderTips();console.log('Tips laddade:',state.players.length);}catch(e){console.log('Ingen tips.xlsx:',e);}
 }
 async function init(){
   await loadTipsFromGitHub();
@@ -642,21 +645,13 @@ async function init(){
     calcAllScores();
     renderLeaderboard();renderMetrics();renderTips();renderScorers();renderAssists();renderPlayoffTips();
   }
-  // Matchdata var 5:e minut
   setInterval(async()=>{
     await loadMatchData();
-    if(state.players.length&&state.apiOk){
-      calcAllScores();
-      renderLeaderboard();renderMetrics();renderTips();renderScorers();renderPlayoffTips();
-    }
+    if(state.players.length&&state.apiOk){calcAllScores();renderLeaderboard();renderMetrics();renderTips();renderScorers();renderPlayoffTips();}
   },REFRESH_MS);
-  // Assistdata var 30:e minut
   setInterval(async()=>{
     await loadAssists();
-    if(state.players.length&&state.apiOk){
-      calcAllScores();
-      renderLeaderboard();renderMetrics();renderAssists();
-    }
+    if(state.players.length&&state.apiOk){calcAllScores();renderLeaderboard();renderMetrics();renderAssists();}
   },ASSIST_REFRESH_MS);
 }
 init();
